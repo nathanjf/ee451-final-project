@@ -1,8 +1,11 @@
 \documentclass{article}
-\usepackage[utf8]{inputenc}
 
-\title{ee451-final-project-proposal}
-\author{nathanjf }
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+
+\title{EE451 Final Project Proposal: \\Generalized Approach to Multi Threaded Kernel Based Image Processing}
+
+\author{Nathan Frank, Alex Baker, Grace Susanto}
 \date{March 2021}
 
 \begin{document}
@@ -11,4 +14,42 @@
 
 \section{Introduction}
 
+As the resolution of images increases with camera and display technology advances, there is a need for faster methods of doing basic kernel based operations to images such as Edge detection, sharpening, and blurring.  This problem is meaningful because as time goes on image sizes will only continue to increase.  In order to quickly compute operations the employ of multiple workers whether they be threads in a CPU or nodes in a network will be necessary to keep the the processing time to an acceptable level.  
+
+This problem is the perfect case for a multi threaded solution.  The serial time is remaining constant at the beginning and the portion of the work that can be made parallel is the part that is growing.  In order to solve this problem, we will be attempting to create a generalized program that will run several operations with an adjustable kernel size and coefficient.  It will also run the same operations in serial time for the purpose of comparison within the same implementation.
+
+\section{Background}
+
+In one of the most popular open source raster-based image editing programs, GIMP (GNU Image Manipulation Program).  Support for applying these techniques to images using multiple threads is still not fully integrated.  As the average image size continues to increase this problem will becomes more pronounced.  Moreover, there are no easily consumer accessible methods for multi threaded image processing.  Most of the work found when researching this topic is on specific implementations for AI training or FPGA (Field Programmable Gate Array) based work for real-time processing.
+
+\section{Proposed Work}
+
+**TODO**
+
+\subsection{Focus}
+
+The focus of this project will be the performance and how scalable the proposed techniques are.  TO evaluate this we will be running each operation for varying amounts of threads, varying image sizes, and varying kernel sizes.  Then, graphing the performance and finding the most scalable and performant kernel sizes and thread counts for each range of image sizes.  We will also be testing two different implementations of the operation.  One where the kernel is clipped between blocks and one where the kernel is allowed to operate on neighboring blocks.  These two implementations will bet referred to fast and exact respectively.
+
+\subsection{Language and Platform}
+
+This project will be done using C++ and POSIX threads (pthread).  We will be using these as they are scalable, do not rely on the GPU, and can be compiled onto any target platform which falls in line with the goal of creating a generalized solution to the program at hand.  If we were to use CUDA it would then require special hardware beyond a basic computer, it would require a NVIDIA GPU.
+
+\subsection{Technical Approach}
+
+We will break down the program into several phases.  There will be three phases to the program:
+
+
+1. Input:  In this phase of the program it will allow for the selection of kernel size, image to target, and amount of threads.  When selection which operation to perform, there will be a selection of preset kernels or the user can input a custom kernel.
+
+
+2. Computation:  The program will start a single thread that will begin working on a serial version of the program for the purpose of comparison and will then start the threaded instance of the program, varying through all input kernel sizes and thread count combinations.  The program will also time the exact and fast implementations
+
+
+3. Result:  The program will save the resultant image of only the last combination attempted in order to save on disk space.  It will also output the execution times of each attempt to the console and to an output text file.
+
+\subsection{Evaluation}
+
+We will take all the outputs we gather and use that data to construct graphs of execution times for varying combinations and determine what the best combination of threads and kernel size is for each image size tested.  The results we expect are vastly increased performance as thread count increases and image size increases while kernel size will have no effect on the fast implementation, but a very slow down and the exact implementation.
+
+\subsection{Challenges}
 \end{document}
