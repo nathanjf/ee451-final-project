@@ -1,1 +1,1 @@
-# ee451-final-project
+# EE451 Final Project: Predicting Optimal Thread Count in Kernel Based Image Processing
