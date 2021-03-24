@@ -38,7 +38,8 @@
                 This project will be done using C++ and POSIX threads (pthread). We will be using this language as it is scalable, does not rely on the GPU, and can be compiled onto any target platform which falls in line with the goal of creating a generalized solution to the problem at hand.  If we were to use CUDA or a similarly specialized approach it would then require special hardware beyond a basic computer.  Given our resources and the desire to test a large amount of systems, it is most optimal for our team to use something that can be run on any platform.
         
             \subsection{Technical Approach}
-                We will break down the program into three main phase: pre-processing, training, and testing.
+                We will break down the program into four main phase: pre-processing, training, testing, and evaluation.
+
                 
                 Pre-processing:  For this phase the program will go through all input images and tag them with their pixel counts and which seed mean they belong to.  The program will then go through and cluster all the input images using a k-means clustering.
                 
