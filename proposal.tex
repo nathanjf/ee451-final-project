@@ -39,6 +39,7 @@
         
             \subsection{Technical Approach}
                 We will break down the program into four main phase: pre-processing, training, testing, and evaluation.
+
                 
                 Pre-processing:  For this phase the program will go through all input images and tag them with their pixel counts and which seed mean they belong to.  The program will then go through and cluster all the input images using a k-means clustering.
                 
@@ -51,7 +52,7 @@
                 The program is planned to be done entirely in C++ using POSIX threads.  It will be broken into several files in order to better distribute the workload between group members.  The project is managed using GitHub with any latex files, such as this proposal, being hosted on an Overleaf project that is synced to the GitHub repository.
             
             \subsection{Evaluation}
-                The results expected are smaller thread counts to be optimal for much smaller images and larger thread counts to be optimal for very large images.  We will be using the images from the  ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012-2017.  This is a set of 100,000 images that we will be grouping into different sizes using a k-means grouping with the standard resolutions of 480p, 720p, 1080p (To be changed depending on data-set averages) as the starting points with total pixel count as the metric for the grouping.  The link for the data-set is http://image-net.org/download.  Additional images that purposefully have certain traits being evaluated by the algorithms may be added to the test data and any such changes will be stated in the final project write-up.
+                The results expected are smaller thread counts to be optimal for much smaller images and larger thread counts to be optimal for very large images.  We will be using the images from the  ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012-2017.  This is a set of 100,000 images that we will be grouped into different sizes using a k-means grouping with the standard resolutions of 480p, 720p, 1080p (To be changed depending on data-set averages) as the starting points with total pixel count as the metric for the grouping.  The link for the data-set is http://image-net.org/download.  Additional images that purposefully have certain traits being evaluated by the algorithms may be added to the test data and any such changes will be stated in the final project write-up.
                 
             \subsection{Challenges}
                 The challenges for this project are implementing the program as listed above.  Our main goal will be to address the issues with computation of image processing on large images and computing what will produce that fastest performance for each image size. By the end of the experiment, using the data captured we should be able to predict how many threads to use for a given image to produce the output as fast as possible before the computation begins.
