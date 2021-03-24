@@ -19,50 +19,51 @@
     
     \section{Introduction}
         \begin{multicols}{2}
-            As the resolution of images increases with constant camera and display technology advances, there is a need for faster methods of doing basic kernel-based operations such as Edge detection, sharpening, and blurring on these images as well as performing more advanced Computer Vision Algorithms faster.  This problem is meaningful because as time goes on, image sizes will only continue to increase.  In order to quickly compute these operations, efficiently employing multiple workers whether they be threads in a CPU or nodes in a network, will be necessary to keep the the processing time to an acceptable level.  However, the brute force approach will often overshoot what is required for optimal speedup.  As higher thread count processors become more commonplace as well, the fastest calculation might not be with the largest amount of threads due to the accumulation of overhead on thread creation and exit.
+            \subsection{Problem}
+                As the resolution of images increases with constant camera and display technology advances, there is a need for faster methods of doing basic kernel-based operations such as edge detection, sharpening, and blurring on these images as well as performing more advanced Computer Vision Algorithms such as a Hough Transform.  This problem is meaningful because as time goes on, image sizes will only continue to increase.  In order to quickly compute these operations, efficiently employing multiple workers whether they be threads in a CPU or nodes in a network, will be necessary to keep the the processing time to an acceptable level.  However, the brute force approach will often overshoot what is required for optimal speedup.  As higher thread count processors become more commonplace, the fastest calculation might not be with the largest amount of threads due to the accumulation of overhead on thread creation and exit.
             
-            The problem being addressed by this project is the avoidance of overhead in parallelized image processing operations.  We will be parallelizing three algorithms, a basic edge detection kernel based algorithm, a Hough transform algorithm, and finally a Moravec corner detection algorithm.  We will be attempting to avoid the overhead of having too many threads by first defining each algorithm in a scalable way and then testing it for a large variety of threads in the range of 1 - 32 threads, the range of dedicated threads on common consumer hardware that is readily available in the year 2021.  After gathering the most optimal thread counts for an average image size using this testing method we will test if the values found are optimal on a smaller selection of images that were not part of the training data.  From the training data we will then try to create an algorithm that takes the speed of the processor, size of the input data, and complexity of desired operation into account when roughly approximating what amount of threads would result in the least amount of excess overhead.
-            
+                The problem being addressed by this project is the avoidance of overhead in parallelized image processing operations.  We will be parallelizing three algorithms, a basic edge detection kernel based algorithm, a Moravec corner detection algorithm, and finally a Hough transform algorithm.  We will be attempting to avoid the overhead of having too many threads by first defining each algorithm in a scalable way and then testing it for a large variety of threads in the range of 1 - 32 threads, the range of dedicated threads on common consumer hardware that is readily available in the year 2021.  After gathering the most optimal thread counts for an average image size using this testing method we will test if the values found are optimal on a smaller selection of images that were not part of the training data.  From the training data we will then try to create an algorithm that takes the speed of the processor, size of the input data, and complexity of desired operation into account when roughly approximating what amount of threads would result in the least amount of excess overhead.
+
+            \subsection{Background}
+                In one of the most popular open source raster-based image editing programs, GIMP (GNU Image Manipulation Program) support for applying these techniques to images using multiple threads is still not fully integrated.  But, the parts that do support multi-threading are only ever run at a global user-defined thread count.  As the average amount of threads per CPU (Central Processing Unit) increases it will become more important that these operations are fully multi-threaded, but they are also run in a manner to reduce any excess.  The purpose of this project is to determine if training a program to avoid overhead will provide any meaningful increase to the performance and to try and produce an algorithm that approximates this value of threads using our sample space of three multi-threaded algorithms.  There are not any consumer programs that function in a way that avoids unnecessary overhead.
         \end{multicols}
-        \pagebreak
-    
-    \section{Background}
-        In one of the most popular open source raster-based image editing programs, GIMP (GNU Image Manipulation Program) support for applying these techniques to images using multiple threads is still not fully integrated.  But, the parts that are do support multi-threading are only ever run at a global user-defined thread count.  As the average amount of threads per cpu increases it will become more important that these operations are fully multi-threaded, but they are also run in a manner to reduce any excess.  The purpose of this project is to determine if training a program to avoid overhead will provide any meaningful increase to the performance.  There are not any consumer programs that function in a way that avoids unnecessary overhead.
-        \pagebreak
+%    \pagebreak
     
     \section{Proposed Work}
         \begin{multicols}{2}
             \subsection{Focus}
-                The focus of this project will be the performance and how scalable the proposed techniques are.  To evaluate this we will be running each operation for varying amounts of threads and varying image sizes with a 3x3 edge detection kernel (while any other kernel would work just as well) and updating the optimal thread-counts for each pixel count.  Then, after training the program, we will be running a group of test images through the program and logging what thread count the program chose for that image and what the actual optimal thread count is as well as how much time was saved or lost by the program choosing that thread count.
+                The focus of this project will be the performance and how scalable the proposed techniques are.  To evaluate this we will be running each operation for varying amounts of threads and updating the optimal thread-counts for each pixel count.  Then, after training the program, we will be running a group of test images through the program and logging what thread count the program chose for that image and what the actual optimal thread count is as well as how much time was saved or lost by the program choosing that thread count.  The last step of our process will be approximating an algorithm for the optimal thread count for a given operation and input.
             
             \subsection{Language and Platform}
-                This project will be done using C++ and POSIX threads (pthread).  We will be using this language as it is scalable, does not rely on the GPU, and can be compiled onto any target platform which falls in line with the goal of creating a generalized solution to the problem at hand.  If we were to use CUDA it would then require special hardware beyond a basic computer, it would require a NVIDIA GPU.
+                This project will be done using C++ and POSIX threads (pthread). We will be using this language as it is scalable, does not rely on the GPU, and can be compiled onto any target platform which falls in line with the goal of creating a generalized solution to the problem at hand.  If we were to use CUDA or a similarly specialized approach it would then require special hardware beyond a basic computer.  Given our resources and the desire to test a large amount of systems, it is most optimal for our team to use something that can be run on any platform.
         
             \subsection{Technical Approach}
-                We will break down the program into three main phases.  Those are pre-processing, training, and testing.
+                We will break down the program into four main phases.  Those are pre-processing, training, and testing.
                 
-                Pre-processing:  For this phase the program will go through all input images and tag them with their pixel counts and which group they belong to.
+                Pre-processing:  For this phase the program will go through all input images and tag them with their pixel counts and which seed mean they belong to.  The program will then go through and cluster all the input images using a k-means clustering.
                 
-                Training: In this phase of the program it will go through each image for all test thread counts and average the most optimal thread count into the means current most optimal thread count.  The per image per thread count execution time will also be logged in order to capture the speedup of each image for both debugging and analysis in the final report.
+                Training: In this phase of the program it will go through each image for all test thread counts and algorithms while averaging the most optimal thread count into that image's mean's current most optimal thread count the operation being tested.  The per image per thread count execution time will also be logged in order to capture the speedup of each image for both debugging and analysis in the final report.
                 
-                Testing: For the testing phase of the program, a image falling into each mean data set will be processed at the optimal thread count decided by the program and then the resulting time will be compared against that images results from the training phase.  The speedup or slowdown caused by the program's optimal thread count will be logged.
+                Testing: For the testing phase of the program, an image falling into each mean will be processed at the optimal thread count decided by the program and then the resulting time will be compared against that images results from the training phase.  The speedup or slowdown caused by the program's optimal thread count will be logged.  
                 
-                The program is planned to be done entirely in C++ using POSIX threads.  It will be broken into several files in order to better distribute the workload between group members.  The project is managed using GitHub with the any latex files being hosted on an overleaf project that is synced to the GitHub repository.
+                Evaluation: For the evaluation phase we will be compiling the results of all the trials and observing how the changing variables affected the execution time and thread counts.  We will then from this data approximate an algorithm that will predict the optimal amount of threads with respect to the hardware running the program.  We will evaluate this by running all our test algorithms on a set of images and comparing the execution time of the thread count selected by the algorithm compared to what the actual optimal thread count is.
+                
+                The program is planned to be done entirely in C++ using POSIX threads.  It will be broken into several files in order to better distribute the workload between group members.  The project is managed using GitHub with any latex files, such as this proposal, being hosted on an Overleaf project that is synced to the GitHub repository.
             
             \subsection{Evaluation}
-                The results expected are smaller thread counts to be optimal for much smaller images and larger thread counts to be optimal for very large images.  We will be using the images from the  ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012-2017.  This is a set of 100,000 images that we will be grouping into different sizes using a k-means grouping with the standard resolutions of 480p, 720p, 1080p (To be changed depending on dataset averages) as the starting points with total pixel count as the metric for the grouping.  The link for the data-set is http://image-net.org/download
+                The results expected are smaller thread counts to be optimal for much smaller images and larger thread counts to be optimal for very large images.  We will be using the images from the  ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012-2017.  This is a set of 100,000 images that we will be grouping into different sizes using a k-means grouping with the standard resolutions of 480p, 720p, 1080p (To be changed depending on data-set averages) as the starting points with total pixel count as the metric for the grouping.  The link for the data-set is http://image-net.org/download.  Additional images that purposefully have certain traits being evaluated by the algorithms may be added to the test data and any such changes will be stated in the final project write-up.
                 
             \subsection{Challenges}
-                The challenges for this project are implementing the program as listed above.  Our main goal will be to address the issues with computation of kernel based image processing on large images and computing what will produce that fastest performance for each image size.  By the end of the experiment, using the data captured we should be able to predict how many threads and what kernel size to use for a given image to produce the output as fast as possible before the computation begins.
+                The challenges for this project are implementing the program as listed above.  Our main goal will be to address the issues with computation of image processing on large images and computing what will produce that fastest performance for each image size. By the end of the experiment, using the data captured we should be able to predict how many threads to use for a given image to produce the output as fast as possible before the computation begins.
                 
             \end{multicols}
             
-        \pagebreak
+%        \pagebreak
     
     \section{Implementation}
         The three algorithm's we will be parallelizing, the kernel based edge detection, the Hough transform algorithm, and the Moravec corner detection will all require different approaches to parallelizing in an efficient and scalable manner.
         
-        Starting with the kernel based edge detection algorithms, these algorithms take the image in as 3 matrices of Red, Green, and Blue values perform convolution with the kernel.  A edge detection kernel looks like the following:\\\\
+        Starting with the kernel based edge detection algorithms, these algorithms take the image in as 3 matrices of Red, Green, and Blue values and perform convolution with the kernel.  A 3x3 edge detection kernel and a 5x5 edge detection kernel look like the following:\\\\
         
         3x3 Edge Detection Kernel
         $\begin{pmatrix*}[r]
@@ -80,35 +81,31 @@
         0 &   0 & -1 &  0 &  0
         \end{pmatrix*}\\\\$
         
-        With a central value of 8 and -1 for all surrounding values the edges will be made more prominent as they will be the only remaining values due to their high local contrast.  To carry out this algorithm out on an image in serial time all you need to do is go pixel by pixel and perform convolution with the kernel at each point.  By the end, the result will be an image that only has the edges remaining.  In order to parallelize this algorithm we will be passing the kernel to each thread and dividing the input image into blocks based on the amount of threads currently being tested.  The pseudo-code for the parallelized pseudo-code is on the following pages.  It is written in a python-like implementation for readability.  One thing to note with the example matrices for the kernel is that for all intents and purposes, the actual values do not matter for this experiment.  The purpose of this experiment is to predicatively improve the performance of an algorithm, but to detect the edges of an image.  The psuedo-code for this algorithm is in section 4.1.
+        Though there are certainly other kernels, the 3x3 edge detection kernel we will be testing functions quite simply.  With a central value of 8 and -1 for all surrounding values the edges will be made more prominent as they will be the only remaining values due to their high local contrast.  To carry out this algorithm on an image in serial time all you need to do is go pixel by pixel and perform convolution with the kernel at each point.  By the end, the result will be an image that only has the edges remaining.  In order to parallelize this algorithm we will be passing the kernel to each thread and dividing the input image into blocks based on the amount of threads currently being tested.  The pseudo-code for the parallelized algorithms is located in the following subsections of this proposal.  It is written in a python-like implementation for readability and simple functions are not explicitly written out to avoid the pseudo-code being cumbersome.  One thing to note with the example matrices for the kernel is that for all intents and purposes, the actual values do not matter for this experiment.  The purpose of this experiment is to predicatively improve the performance of an algorithm, not to detect the edges of an image.
         
         The next algorithm we will be parallelizing, in order of complexity, is the Moravec corner detection algorithm.  This algorithm involves going pixel by pixel and comparing the intensity of the surrounding regions of that pixel.  In order to get the intensity readings, we will first be turning the images from full color into gray-scale by performing a conversion using the luminosity method where we multiply the red, green, and blue values by a weight and add them together to get which value between 0-256 should be the grey-scale color of that pixel.  This conversion will also be parallelized.  The formula for this conversion is as follows:\\\\
         
         \[New value = (0.3*Red + 0.59*Green + 0.11*Blue)\]\\
         
-        This algorithm will also be broken into blocks with a grid of threads running over it.  By taking advantage of the Concurrent read ability of POSIX threads, the algorithm can be simplified.  The python-like psuedo-code of this algorithm is in section 4.2.  The Moravec corner detection algorithm using a small region to compare between the adjacent tiles of the same size.  For our implementation of the algorithm we will be using a 3x3 window size.  In order to find if a selected region around a pixel is a corner, we will be comparing the squared intensity differences of the intensity of the root region and one of the selected adjacent regions and finding the minimum squared intensity difference value between all adjacent regions.  If the value is lower than a threshold it is a corner.  Because we are not evaluating the output, but just the performance of the algorithm with varying thread counts, we will make our output look interesting and add a red dot to the output image wherever there is a corner.  This should not add any significant slow-down to the execution as it does not require any loops, only setting the value of pixels near and around a point to red.
+        This algorithm will also be broken into blocks with a grid of threads running over it.  By taking advantage of the concurrent read ability of POSIX threads, the algorithm can be simplified.  The Moravec corner detection algorithm uses a small region and compares between the adjacent overlapping tiles of the same size.  For our implementation of the algorithm we will be using a 3x3 window size.  In order to find if a selected region around a pixel is a corner, we will be comparing the squared intensity differences of the intensity of the root region and one of the selected adjacent regions and finding the minimum squared intensity difference value between all adjacent regions.  If the value is lower than a threshold it is a corner.  Because we are not evaluating the output, but just the performance of the algorithm with varying thread counts, we will make our output look interesting and add a red dot to the output image wherever there is a corner.  This should not add any significant slow-down to the execution as it does not require any loops, only setting the value of pixels near and around a point to red.
         
-        The last algorithm we will be parallelizing is the Hough Transform.  The Hough Transform is meant to detect where there are lines in the image.  In order for the Hough Transform to work, the image must first be run through an edge detection algorithm and thresholded.  Once the image has been thresholded, the image will then be broken into blocks of data where pixel by pixel, the threads will search for a pixel that is white, meaning part of an edge after the threshold, and the feature space for that pixel will be explored in terms of $\theta$ and $\rho$, the angle of the line around that pixel, and the distance from the center of the image around that point.  Each time a point is explored in the feature space, we are going to increment a counter of potential lines that went through that point in the feature space.  Once every pixel has had it's feature space explored, we will then take only the 5 highest values and with those parameters, we are going to plot the 4 most prominent lines on the image.  Again, the actual output does not matter, so long as it is performant and accurate.  The reason we are plotting the lines on the original image is only for the purpose of quickly verifying the accuracy of the algorithm.  The psuedo code for this algorithm is in section 4.3.
+        The last algorithm we will be parallelizing is the Hough Transform.  The Hough Transform is meant to detect where there are lines in the image.  In order for the Hough Transform to work, the image must first be run through an edge detection algorithm and then have every pixel run under a threshold filter.  The threshold will simply set a pixel to pure white if it is above a value or pure black if it is under that value.  After these operations have been performed, the image will then be broken into blocks of data where pixel by pixel, the threads will search for a pixel that is white, meaning part of an edge after the threshold, and the feature space for that pixel will be explored in terms of $\theta$ and $\rho$, the angle of the line around that pixel, and the distance from the center of the image around that point.  Each time a point is explored in the feature space, we are going to increment a counter of potential lines that went through that point in the feature space.  Once every pixel has had it's feature space explored, we will then take only the 20 highest values and with those parameters, we are going to plot the 20 most prominent lines on the image.  Again, the actual output does not matter, so long as it performs well and is accurate.  The reason we are plotting the lines on the original image is only for the purpose of quickly verifying the accuracy of the algorithm.
+        
+        The last step of our project will be evaluating the results from the different algorithms and trying to create an algorithm that predicts the optimal thread count based off the processor speed of the system, the complexity of the algorithm, and the size of the input data.  We are predicting that as the image size and processor speed increase more threads will become optimal over a smaller amount of threads.  This is due to a faster processor being able to reduce the weight of any serial or atomic operations and a larger image size increasing the weight of the parallel operations in the execution.
         \pagebreak
         
-        \subsection{Parallelized Edge Detection Psuedo-Code}
-        \begin{lstlisting}
+        \subsection{Parallel Edge Detection Pseudo-Code}
+        \begin{lstlisting}[basicstyle=\footnotesize]
+
 # Load the image in as an array of int[i][j][k]
 image = load_image()
-thread_count = input("ThreadCount: ")
+thread_count = input("Thread Count: ")
 kernel = [{-1, -1, -1,},{-1, 8, -1}, {-1, -1, -1}]
 
-# The threads will be split into a grid and 
-# assigned chunks of the image
-v_count = len(image[i])/sqrt(thread_count)
-h_count = len(image[i][j])/sqrt(thread_count)
+v_count = len(image)/sqrt(thread_count)
+h_count = len(image[i])/sqrt(thread_count)
 
-# v is this threads vertical ID
-# h is this threads horizontal ID
-# image is the input image
-# result is the output image
-# kernel is a copy of the kernel
-def kernel_function(v, h, image, result, kernel):
+def thread_function(v, h, image, result, kernel):
     h_offset = h * h_count
     v_offset = v * v_count
     
@@ -116,9 +113,9 @@ def kernel_function(v, h, image, result, kernel):
         for j in range(h_offset, h_offset + v_count):
             for k in range(0,3):
                 # Perform convolution, sum all the neighbors 
-                # multiplied by their coefficients
-                # Omited actual formula to save space
-                result[i][j][k] = convolute(kernel, image[i][j][k])
+                # multiplied by the kernel coefficients
+                # Omitted actual formula to save space
+                result[i][j][k] = conv2D(kernel, image[i][j][k])
 
 def main():
     for i in range(0, v_count):
@@ -136,48 +133,38 @@ def main():
         \end{lstlisting}
         \pagebreak       
         
-        \subsection{Parallelized Moravec Corner Detection Algorithm Psuedo-Code}
-                \begin{lstlisting}
-# Load the image in as an array of int[i][j][k]
+        \subsection{Parallel Moravec Corner Detection Pseudo-Code}
+                \begin{lstlisting}[basicstyle=\footnotesize]
+
 image = load_image()
-thread_count = input("ThreadCount: ")
-kernel = [{-1, -1, -1,},{-1, 8, -1}, {-1, -1, -1}]
+thread_count = input("Thread Count: ")
 threshold = 0.5 # Any threshold
 
-# The threads will be split into a grid and 
-# assigned chunks of the image
-v_count = len(image[i])/sqrt(thread_count)
-h_count = len(image[i][j])/sqrt(thread_count)
+v_count = len(image)/sqrt(thread_count)
+h_count = len(image[i])/sqrt(thread_count)
 
+# Return the average value of the 3x3 window centered here
 def window(i, j):
-    intensity = (result[i][j] + 
-                result[i][j-1] + 
-                result[i][j+1] +
-                result[i-1][j] + 
-                result[i-1][j-1] + 
-                result[i-1][j+1] +
-                result[i+1][j] + 
-                result[i+1][j-1] + 
-                result[i+1][j+1]) / 9
-    return intensity
 
-def kernel_function(v, h, image, result):
+# Set this area to a red dot on the output
+def red_dot(i, j):
+
+def thread_function(v, h, image, result):
     h_offset = h * h_count
     v_offset = v * v_count
     
-    # Convert block to grayscale
+    # Convert block to gray scale
     for i in range(v_offset, v_offset + v_count):
         for j in range(h_offset, h_offset + v_count):
             result[i][j] = 
                 (0.3*image[i][j][0]+0.59*image[i][j][1]+0.11*image[i][j][2])
     
-    border.arrived() # Wait till all threads have created the grayscale images
+    border.arrived() # Wait till all threads have created the gray scale
     
     for i in range(v_offset, v_offset + v_count):
         for j in range(h_offset, h_offset + v_count):
             neighbors = []
-            sqr_int_diff = 0
-            
+
             for u in range(-1,2):   
                 for v in range(-1,2);
                     if u == 0 and v == 0:
@@ -189,9 +176,7 @@ def kernel_function(v, h, image, result):
             minimum = min(neighbors)
             # It is a corner make a red dot on the image
             if minimum < threshold:
-                image[i][j][0] = 255
-                image[i][j][1] = 0
-                image[i][j][2] = 0
+                red_dot(i,j)
 
 def main():
     for i in range(0, v_count):
@@ -209,28 +194,28 @@ def main():
         \end{lstlisting}
         \pagebreak
 
-        \subsection{Parallelized Hough Transform Algorithm Psuedo-Code}
-        \begin{lstlisting}
-# Load the image in as an array of int[i][j][k]
+        \subsection{Parallel Hough Transform Pseudo-Code}
+        \begin{lstlisting}[basicstyle=\footnotesize]
+
 image = load_image()
-thread_count = input("ThreadCount: ")
-result = init_result() # an array of 0s of [sqrt(height^2 + width^2)][180]
+thread_count = input("Thread Count: ")
 
 # The threads will be split into a grid and 
 # assigned chunks of the image
-v_count = len(image[i])/sqrt(thread_count)
-h_count = len(image[i][j])/sqrt(thread_count)
+v_count = len(image)/sqrt(thread_count)
+h_count = len(image[i])/sqrt(thread_count)
 
-# v is this threads vertical ID
-# h is this threads horizontal ID
-def kernel_function(v, h, image, result, kernel):
+def thread_function(v, h, image, result, kernel):
     h_offset = h * h_count
     v_offset = v * v_count
-
-    # Edge detection algorithm from 4.1 with
+    result = init_result() #local copy
+    
+    # Gray scale code from Moravec
+    # Edge detection algorithm Kernel 1
     # added threshold to either 0 or 255 based off median of 128
     
     barrier.arrived() # wait for every thread to finish
+    
     for i in range(v_offset, v_offset + v_count):
         for j in range(h_offset, h_offset + v_count):
             for theta in range(0,180): # you only need to do half a circle
@@ -245,7 +230,7 @@ def kernel_function(v, h, image, result, kernel):
     # Each thread will have its arguments stored in an array
     # In the actual program, which can be used to reference by index
     for i in range(0,thread_count)
-        #merge results'
+        #merge results
         stride = stride * 2
 
 def main():
@@ -260,13 +245,8 @@ def main():
     for i in range(0, v_count):
         for j in range (0, h_count):
             join_thread(i, j)
-            
-    # Add the lines to the image.  This is not part of the algorithm and is
-    # not going to be part of the execution time, so it doesn't need to be
-    # described in detail
         \end{lstlisting}
         \pagebreak       
-        
         
 \section{Group Work Division}
     Because this section is not relevant to the actual logistics of the project, it has been moved to the end of the proposal.
@@ -274,7 +254,7 @@ def main():
     \item Preprocessing
         \begin{itemize}
         \item Tag images with appropriate pixel counts
-        \item Multi-threaded kmeans
+        \item Multi-threaded k-means
         \end{itemize}
         
     \item Testing
@@ -282,7 +262,7 @@ def main():
         \item Multi-threaded kernel edge detection
         \item Multi-threaded Moravec corner detection
         \item Multi-threaded Hough Transform
-        \item kmeans updates
+        \item k-means updates
         \end{itemize}
         
     \item Thread management
