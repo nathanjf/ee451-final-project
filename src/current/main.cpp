@@ -1,17 +1,12 @@
-// OpenCV is used to read and save images.
 #include <opencv2/opencv.hpp>
 
-// Data types
 #include <vector>
 #include <string>
 
-// File management
 #include <dirent.h>
 
-// POSIX Threads
 #include <pthread.h>
 
-// Input and output
 #include <iostream>
 #include <fstream>
 
@@ -26,39 +21,48 @@
 #define UNSET              "NULL"
 
 // Program values
-#define MAX_THREAD_COUNT 32   // This is the thread count that will be used for anything not being tested
+#define MAX_THREAD_COUNT 32  
+
+typedef std::pair<std::string, std::pair<int, int>> image_path_mean_type;
+
 
 // Global variables
-int kmeans[5] = {256*144*3, 426*240*3, 740*480*3, 1280*720*3, 1920*1080*3};
 std::vector<std::string> image_paths;
-std::vector<std::pair<std::string, std::pair<int, int>>> image_paths_means;
+std::vector<image_path_mean_type> image_paths_means;
 
-#define KMEANS_ITERATIONS 100
-
+// Thread id array
 pthread_t tid[MAX_THREAD_COUNT];
 
-// kmean clustering specific variables
+// kmean clustering specific variables , 1920*1080*3
+#define KMEANS_ITERATIONS 100
+int kmeans[4] = {256*144*3, 426*240*3, 740*480*3, 1280*720*3};
 struct kmeansArgs {
-    std::vector<std::pair<std::string,std::pair<int,int>>> image_paths_means;
+    std::vector<image_path_mean_type> image_paths_means;
 };
 kmeansArgs kmeansArgs_tid[MAX_THREAD_COUNT];
 pthread_mutex_t kmeansMutex;
 
 void * kmeansClustering(void * arg) {
     kmeansArgs * kmeansArgs_tid = (kmeansArgs *)arg;
+
+    /*
+        For every iteration check the value of the vector's points 
+    */
+
     for(int i = 0; i < KMEANS_ITERATIONS; i++) {
-        //Assign to a point, mutex lock, update kmean value
         for(int j = 0; j < kmeansArgs_tid->image_paths_means.size(); j++) {
+            int pixel_count = image_paths_means[j].second.first;
+            int kmean = image_paths_means[j].second.second;
+            int shortest_distance = INT32_MAX;
             for(int k = 0; k < sizeof(kmeans)/sizeof(int); k++) {
-                int shortest_distance = INT32_MAX;
-                if (shortest_distance > abs(kmeans[k] - kmeansArgs_tid->image_paths_means[j].second.first)) {
-                    shortest_distance = abs(kmeans[k] - kmeansArgs_tid->image_paths_means[j].second.first);
-                    kmeansArgs_tid->image_paths_means[j].second.second = k;
+                if (shortest_distance > abs(kmeans[k] - pixel_count)) {
+                    shortest_distance = abs(kmeans[k] - pixel_count);
+                    kmean = k;
                 }
-            }
+            }        
+            image_paths_means[j].second.second = kmean;
             pthread_mutex_lock(&kmeansMutex);
-            kmeans[image_paths_means[j].second.second] = 
-                (kmeans[image_paths_means[j].second.second] + image_paths_means[j].second.first) / 2;
+            kmeans[kmean] = (kmeans[kmean] + pixel_count) / 2;
             pthread_mutex_unlock(&kmeansMutex);
         }
     }
@@ -77,7 +81,9 @@ int main(int argc, char * argv[]) {
     std::string AMINATION_IMAGE_DIRECTORY   = UNSET;
     
     if(argc == 3) {
-        // Parse the mode
+        /*
+            Parse the mode and exit if it is not valid
+        */
         std::string MODE_ARG = argv[1];
         MODE = std::stoi(MODE_ARG);
         switch(MODE){
@@ -97,7 +103,10 @@ int main(int argc, char * argv[]) {
                 return 0;
         }
 
-        // Parse the config lines and exit if they are not there
+        /*
+            Parse the config lines and exit if they are not there
+        */
+
         std::string PATH_ARG = argv[2];
         CONFIG.open(PATH_ARG, std::fstream::in);
         if(CONFIG.is_open()){
@@ -154,7 +163,10 @@ int main(int argc, char * argv[]) {
             DIR *               training_dir;
             struct dirent *     training_dirent;
 
-            // Loading all the JPEGs into the vector, exit if the directory doesnt open
+            /*
+                Load all the images into a vector of image paths and error check
+            */
+            
             training_dir = opendir(TRAINING_IMAGE_DIRECTORY.c_str());
             if(training_dir) {
                 while((training_dirent = readdir(training_dir)) != NULL) {
@@ -170,7 +182,10 @@ int main(int argc, char * argv[]) {
                 //Not a valid directory
             }
 
-            // If no JPEGs were found it will exit, else print all the paths for now
+            /*
+                If no images were found print an error statement
+            */
+
             if(image_paths.size() == 0) {
                 //**TODO**
                 //No JPEGs in directory
@@ -181,7 +196,12 @@ int main(int argc, char * argv[]) {
                 std::cout << "Sucessfully loaded " << image_paths.size() << " images" << std::endl;
             }
                     
-            //Initialize data for the kmeans clustering
+            /*
+                Initialize the data by creating the training data vector and 
+                tagging each image with their pixel counts and their closest
+                initial centroid
+            */
+
             for (std::string image_path : image_paths) {
                 
                 cv::Mat image = cv::imread(image_path);
@@ -195,32 +215,71 @@ int main(int argc, char * argv[]) {
                     }
                 }
                 std::pair<int,int> image_data (pixel_count, init_mean);
-                std::pair<std::string, std::pair<int, int>> image_path_mean (image_path, image_data);
+                image_path_mean_type image_path_mean (image_path, image_data);
                 image_paths_means.push_back(image_path_mean);
             }
 
-            for(int i = 0; i < 5; i++) {
+            for(int i = 0; i < sizeof(kmeans)/sizeof(int); i++) {
                 std::cout << kmeans[i] << " ";
             }
             std::cout << std::endl;
 
-            //Spawn the kmean clustering threads
+            /*
+                Partition the vector to the threads and spawn all the threads
+                If there is a remainder in the partition allocate those to the last thread
+            */
+
+
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
-                int offset = image_paths_means.size()/MAX_THREAD_COUNT;
-                for(int j = i * offset; j < (i * offset) + offset; j++) {
-                    kmeansArgs_tid[i].image_paths_means.push_back(image_paths_means[j]);
+                if(i < MAX_THREAD_COUNT - 1) {
+                    int offset = image_paths_means.size()/MAX_THREAD_COUNT;
+                    for(int j = i * offset; j < (i * offset) + offset; j++) {
+                        kmeansArgs_tid[i].image_paths_means.push_back(image_paths_means[j]);
+                    }
+                }
+                else {
+                    if(image_paths_means.size()%MAX_THREAD_COUNT == 0) {    
+                        int offset = image_paths_means.size()/MAX_THREAD_COUNT;
+                        for(int j = i * offset; j < (i * offset) + offset; j++) {
+                            kmeansArgs_tid[i].image_paths_means.push_back(image_paths_means[j]);
+                        }
+                    }
+                    else {
+                        int remainder = image_paths_means.size()%MAX_THREAD_COUNT;
+                        int offset = image_paths_means.size()/MAX_THREAD_COUNT;
+                        for(int j = i * offset; j < (i * offset) + offset + remainder; j++) {
+                            kmeansArgs_tid[i].image_paths_means.push_back(image_paths_means[j]);
+                        }
+                    }
                 }
                 pthread_create(&tid[i], NULL, kmeansClustering, (void*)&kmeansArgs_tid[i]);
                 
             }
+
+            /*
+                Clear the current values in the vector and write the new values
+                the threads have calculated
+            */
+
+            image_paths_means.clear();
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
                 pthread_join(tid[i], NULL);
+                for(std::pair<std::string, std::pair<int, int>> image_path_mean: kmeansArgs_tid[i].image_paths_means)
+                {
+                    image_paths_means.push_back(image_path_mean);
+                }
             }
 
-            for(int i = 0; i < 5; i++) {
+            for(int i = 0; i < sizeof(kmeans)/sizeof(int); i++) {
                 std::cout << kmeans[i] << " ";
             }
             std::cout << std::endl;
+            std::cout << image_paths_means.size() << std::endl;
+
+            /*
+                At this point the kmeans are calculated based off the seed centroids
+                and every image in the vector will have the proper tagging
+            */
 
             //**TODO**
             // EDGE

@@ -1,0 +1,2 @@
+TRAINING_IMAGE_DIRECTORY=/home/nathanjf/testimages/
+TRAINING_DATA_PATH=/home/nathanjf/github/ee451-final-project/src/training_data.txt

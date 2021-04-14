@@ -8,4 +8,4 @@ g++ main.cpp -o main `pkg-config --libs --cflags opencv` -lpthread
 
 Running:
 
-./a.out 1 ~/github/ee451-final-project/src/v0.1/config.txt
+./main 1 ~/github/ee451-final-project/src/config.txt
