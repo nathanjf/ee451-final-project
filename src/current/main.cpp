@@ -42,11 +42,27 @@ struct kmeansArgs {
 kmeansArgs kmeansArgs_tid[MAX_THREAD_COUNT];
 pthread_mutex_t kmeansMutex;
 
+// Edge detection specific variables
+int edge_optimal_threads[4] = {0, 0, 0 ,0};
+
+// Moravec Corner detection specific variables
+int moravec_optimal_threads[4] = {0, 0, 0, 0};
+
+// Hough Transform specific variables
+int hough_optimal_threads[4] = {0, 0, 0, 0};
+
+int color2gray(int blue, int green, int red) {
+    int gray = 0.299 * (double)red + 0.587 * (double)green + 0.114 * (double)blue;
+    //int gray = (red + green + blue) / 3;
+    return gray;
+}
+
 void * kmeansClustering(void * arg) {
     kmeansArgs * kmeansArgs_tid = (kmeansArgs *)arg;
 
     /*
-        For every iteration check the value of the vector's points 
+        For every iteration check the distance of each point to each centroid
+        Assign the point to its closest centroid and then update the value of that centroid
     */
 
     for(int i = 0; i < KMEANS_ITERATIONS; i++) {
@@ -121,7 +137,6 @@ int main(int argc, char * argv[]) {
                     TRAINING_DATA_PATH = line.substr(line.find("=") + 1);
                     VALID_CONFIG_LINES++;
                 }
-                
             }
             if(VALID_CONFIG_LINES != TOTAL_CONFIG_LINES) {
                 if(TRAINING_IMAGE_DIRECTORY == UNSET) {
@@ -193,7 +208,8 @@ int main(int argc, char * argv[]) {
                 return 0;
             }
             else {
-                std::cout << "Sucessfully loaded " << image_paths.size() << " images" << std::endl;
+                //**TODO**
+                //Print loaded message
             }
                     
             /*
@@ -219,7 +235,7 @@ int main(int argc, char * argv[]) {
                 image_paths_means.push_back(image_path_mean);
             }
 
-            for(int i = 0; i < sizeof(kmeans)/sizeof(int); i++) {
+            for(int i = 0; i < 4; i++) {
                 std::cout << kmeans[i] << " ";
             }
             std::cout << std::endl;
@@ -264,31 +280,94 @@ int main(int argc, char * argv[]) {
             image_paths_means.clear();
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
                 pthread_join(tid[i], NULL);
-                for(std::pair<std::string, std::pair<int, int>> image_path_mean: kmeansArgs_tid[i].image_paths_means)
+                std::cout << kmeansArgs_tid[i].image_paths_means.size() << std::endl;
+                for(image_path_mean_type image_path_mean: kmeansArgs_tid[i].image_paths_means)
                 {
                     image_paths_means.push_back(image_path_mean);
                 }
             }
 
-            for(int i = 0; i < sizeof(kmeans)/sizeof(int); i++) {
+            for(int i = 0; i < 4; i++) {
                 std::cout << kmeans[i] << " ";
             }
             std::cout << std::endl;
-            std::cout << image_paths_means.size() << std::endl;
 
             /*
                 At this point the kmeans are calculated based off the seed centroids
                 and every image in the vector will have the proper tagging
             */
 
-            //**TODO**
-            // EDGE
+            struct edge_args {
+                cv::Mat * input_image;
+                cv::Mat * output_image;
+            };
 
-            //**TODO**
-            // CORNER
+            edge_args edge_args_tid[MAX_THREAD_COUNT];
 
-            //**TODO**
-            // HOUGH TRANSFORM
+            //iterate over every image and perform the 3 transforms below
+            for(image_path_mean_type image_path_mean: image_paths_means) {
+                std::string image_path = image_path_mean.first;
+                cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
+
+                for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
+                    for(int idx = 0; idx < thread_count; idx++) {
+                        int cols = image.cols/thread_count;
+                        int remainder = 0;
+                        if(idx == thread_count - 1 && image.cols%thread_count != 0) {
+                            remainder = image.cols%thread_count;
+                        }
+                        std::cout << "Reached" << std::endl;
+                        edge_args_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
+                        edge_args_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
+                        for(int i = 0; i < image.rows; i++) {
+                            int j_write = 1;
+                            int i_write = i + 1;
+                            for(int j = idx * cols; j < idx * cols + cols + remainder; j++) {
+                                edge_args_tid[idx].input_image->at<cv::Vec3b>(i_write, j_write) = image.at<cv::Vec3b>(i, j);
+                                j_write++;
+                            }
+                        }
+                        //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
+
+                    }
+                    for(int idx = 0; idx < thread_count; idx++) {
+                        
+
+                        
+                        delete edge_args_tid[idx].input_image;
+                        delete edge_args_tid[idx].output_image;
+                    }
+                }
+
+                for(int i = 0; i < image.rows; i++) {
+                    for(int j = 0; j < image.cols; j++) {
+                        cv::Vec3b intensity = image.at<cv::Vec3b>(i, j);
+                        //image_b[i][j] = intensity.val[0];
+                        //image_g[i][j] = intensity.val[1];
+                        //image_r[i][j] = intensity.val[2];
+                        
+                        //test.at<uchar>(i, j) = color2gray(intensity.val[0], intensity.val[1], intensity.val[2]);
+                    }
+
+                }
+
+                //cv::imwrite("/home/nathanjf/test.JPEG", test);
+
+                //turn image into an int array
+
+                //**TODO**
+                // EDGE
+
+                    //Partition image into blocks
+                    //Partition images into columns to allow more thread control?
+
+                //**TODO**
+                // CORNER
+
+                //**TODO**
+                // HOUGH TRANSFORM
+
+            }
 
             break;
 
