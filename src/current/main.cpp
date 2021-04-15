@@ -54,6 +54,14 @@ args args_tid[MAX_THREAD_COUNT];
 
 // Hough Transform specific variables
 int hough_optimal_threads[4] = {0, 0, 0, 0};
+struct args_hough {
+    cv::Mat * input_image;
+    cv::Mat * output_image;
+    int ** accumulator_space;
+    int d;
+    int idx;
+};
+args_hough args_hough_tid[MAX_THREAD_COUNT];
 
 int color2gray(int blue, int green, int red) {
     int gray = 0.299 * (double)red + 0.587 * (double)green + 0.114 * (double)blue;
@@ -268,6 +276,84 @@ void * moravecCorner(void * arg) {
     }
     delete temp_int;
 
+    return NULL;
+}
+
+void * houghTransform(void * arg) {
+    args_hough * args_tid = (args_hough *)arg;
+    cv::Mat * temp = new cv::Mat(args_tid->output_image->rows, args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+
+    // Convert to gray
+    for(int x = 0; x < args_tid->input_image->cols; x++) {
+        for(int y = 0; y < args_tid->input_image->rows; y++) {
+            cv::Vec3b pixel = args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
+            temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);            
+        }
+    }
+
+    for(int x = 1; x < args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 1; y++) {
+            int Gb = 
+                    1  * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x    , y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y    ));
+            Gb = Gb / 9;
+            temp->at<uchar>(cv::Point(x, y)) = Gb;
+        }
+    }
+
+    for(int x = 1; x < args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 1; y++) {
+            int Gy = 
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    -1 * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int Gx =
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    2  * temp->at<uchar>(cv::Point(x + 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int G = (int)sqrt(Gx * Gx + Gy * Gy);
+            
+            if(G > 175) {
+                G = 255;
+            }
+            else {
+                G = 0;
+            }
+            args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
+        }
+    }
+
+    // Do the accumulator now
+    for(int x = 1; x < args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 1; y++) {
+            if(args_tid->output_image->at<uchar>(cv::Point(x, y)) == 255) {
+                //Feature space exploration
+                for(int theta = 0; theta < 180; theta++) {
+                     
+                    int p = (int)((double)(args_tid->idx + (x - 1)) * cos((double)theta * 3.14/180.0) + (double)(y - 1) * sin((double)theta * 3.14/180.0)) + args_tid->d;
+                    args_tid->accumulator_space[theta][p] += 1;
+                }
+            }
+        }
+    }
+
+    delete temp;
+    
     return NULL;
 }
 
@@ -488,6 +574,7 @@ int main(int argc, char * argv[]) {
                 std::string image_path = image_path_mean.first;
                 cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
                 cv::Mat output(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
+                int d = (int)sqrt((double)(image.cols * image.cols + image.rows * image.rows));
 
                 cv::imwrite("/home/nathanjf/testInput.JPEG", image);
 
@@ -510,12 +597,45 @@ int main(int argc, char * argv[]) {
                             for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
                                 int y_write = 1;
                                 for(int y = 0; y < image.rows; y++) {
+                                    if(y == 0) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    if(y == image.rows - 1) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));        
+                                    }
+
                                     if(x == idx * cols && x - 1 >= 0) {
                                         args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
                                     }
-                                    if(x == idx * cols + cols + remainder - 1 && x + 1 <= image.cols) {
+                                    else if (x == idx * cols && !(x - 1 >= 0)){
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    
+                                    if(x == idx * cols + cols + remainder - 1 && x + 1 < image.cols) {
                                         args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
                                     }
+                                    if(x == idx * cols + cols + remainder - 1 && !(x + 1 < image.cols)) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+
+                                    //Top corner
+                                    if(y == 0){
+                                        if(x == idx * cols) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                        if(x == idx * cols + cols + remainder - 1) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    } 
+                                    if(y == image.rows - 1) {
+                                        if(x == idx * cols) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                        if(x == idx * cols + cols + remainder - 1) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    }
+
                                     args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
                                     y_write++;
                                 }
@@ -544,7 +664,7 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                            cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
                             
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
@@ -613,24 +733,159 @@ int main(int argc, char * argv[]) {
 
                         }
 
-                        /*
-                        for(int x = 0; x < output.cols; x++) {
-                            for(int y = 0; y < output.rows; y++) {
-                                if(output.at<uchar>(cv::Point(x, y)) == 255) {
-                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[0] = 0;
-                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
-                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 255;
-                                }
+                        cv::imwrite("/home/nathanjf/testOutputMoravec.JPEG", output);
 
+                    // Hough Transform
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            int cols = image.cols/thread_count;
+                            int remainder = 0;
+                            if(idx == thread_count - 1 && image.cols%thread_count != 0) {
+                                remainder = image.cols%thread_count;
+                            }
+                            
+                            /*
+                                Take note that memory is being allocated for the thread images here
+                            */
+
+                            
+                            args_hough_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
+                            args_hough_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC1, cv::Scalar(0));
+                            args_hough_tid[idx].accumulator_space = new int*[180];
+                            for(int i = 0; i <  180; i++) {
+                                args_hough_tid[idx].accumulator_space[i] = new int[2*d];
+                                for(int j = 0; j < 2*d; j++) {
+                                    args_hough_tid[idx].accumulator_space[i][j] = 0;
+                                }
+                            }
+                            args_hough_tid[idx].d = d;
+                            args_hough_tid[idx].idx = idx * cols;
+
+                            int x_write = 1;
+                            for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
+                                int y_write = 1;
+                                for(int y = 0; y < image.rows; y++) {
+                                    if(y == 0) {
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    if(y == image.rows - 1) {
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));        
+                                    }
+                                    if(x == idx * cols && x - 1 >= 0) {
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
+                                    }
+                                    else if (x == idx * cols && !(x - 1 >= 0)){
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    if(x == idx * cols + cols + remainder - 1 && x + 1 < image.cols) {
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
+                                    }
+                                    if(x == idx * cols + cols + remainder - 1 && !(x + 1 < image.cols)) {
+                                        args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    if(y == 0){
+                                        if(x == idx * cols) {
+                                            args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                        if(x == idx * cols + cols + remainder - 1) {
+                                            args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    } 
+                                    if(y == image.rows - 1) {
+                                        if(x == idx * cols) {
+                                            args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                        if(x == idx * cols + cols + remainder - 1) {
+                                            args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    }
+
+                                    args_hough_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                    y_write++;
+                                }
+                                x_write++;
+                            }
+                            //Test print if you just want the results of one image
+                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
+                            
+                            pthread_create(&tid[idx], NULL, houghTransform, (void*)&args_hough_tid[idx]);
+                        }
+                        
+                        // Merge image slices
+                        int ** accumulator_space = new int*[180];
+                        for(int i = 0; i < 180; i++) {
+                            accumulator_space[i] = new int[2*d];
+                            for(int j = 0; j < 2*d; j++) {
+                                accumulator_space[i][j] = 0;
                             }
                         }
-                        */
-                        cv::imwrite("/home/nathanjf/testOutputMoravec.JPEG", output);
+                                                
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            pthread_join(tid[idx], NULL);
+                            int x_write = image.cols/thread_count * idx;
+                            for(int x = 1; x < args_hough_tid[idx].output_image->cols - 1; x++) {
+                                int y_write = 0;
+                                for(int y = 1; y < args_hough_tid[idx].output_image->rows - 1; y++) {
+                                    output.at<uchar>(cv::Point(x_write, y_write)) = args_hough_tid[idx].output_image->at<uchar>(cv::Point(x, y));
+                                    y_write++;
+                                }
+                                x_write++;
+                            }
+                            for(int i = 0; i <  180; i++) {
+                                for(int j = 0; j < 2*d; j++) {
+                                    accumulator_space[i][j] = accumulator_space[i][j] + args_hough_tid[idx].accumulator_space[i][j];
+                                }
+                            }
+
+                            /*
+                                Take note that memory is being freed here
+                            */
+                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                        
+                            delete args_hough_tid[idx].input_image;
+                            delete args_hough_tid[idx].output_image;
+                            for(int i = 0; i <  180; i++) {
+                                delete args_hough_tid[idx].accumulator_space[i];
+                            }
+                            delete args_hough_tid[idx].accumulator_space;
+                        }
+                        // Turn accumulator into image
+                        int max = 0;
+                        int max_theta = 0;
+                        double max_p = 0;
+
+                        for(int theta = 0; theta < 180; theta++) {
+                            for(int p = 0; p < 2*d; p++) {
+                                if(accumulator_space[theta][p] > max) {
+                                    max = accumulator_space[theta][p];
+                                    max_p = p - d + 1;
+                                    max_theta = theta;
+                                }
+                            }
+                        }
+
+                        //max_theta = 59;
+                        //max_p = 193;
+
+                        double a = cos((double)max_theta * 3.14/180.0);
+                        double b = sin((double)max_theta * 3.14/180.0);
+                        double x0 = (a * (double)max_p); //+ image.cols/2;
+                        double y0 = (b * (double)max_p); //+ image.rows/2;
+                        int x1 = (int)(x0 + 1000.0 * (-b));
+                        int y1 = (int)(y0 + 1000.0 * (a));
+                        int x2 = (int)(x0 - 1000.0 * (-b));
+                        int y2 = (int)(y0 - 1000.0 * (a));
+
+                        for(int i = 0; i <  180; i++) {
+                            delete accumulator_space[i];
+                        }
+                        delete accumulator_space;
+
+                        cv::Mat temp = image.clone();
+                        cv::line(temp, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0,0,255), 3);
+                        //cv::imwrite("/home/nathanjf/testOutputHough.JPEG", houghOutput);
+                        cv::imwrite("/home/nathanjf/testOutputHoughVisual.JPEG", temp);
                 }
             }
-
-            //**TODO**
-            // HOUGH TRANSFORM
 
         case TESTING_MODE :
             break;
