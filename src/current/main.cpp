@@ -664,7 +664,7 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
                             
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
