@@ -53,6 +53,11 @@ edge_args edge_args_tid[MAX_THREAD_COUNT];
 
 // Moravec Corner detection specific variables
 int moravec_optimal_threads[4] = {0, 0, 0, 0};
+struct moravec_args {
+    cv::Mat * input_image;
+    cv::Mat * output_image;
+};
+moravec_args moravec_args_tid[MAX_THREAD_COUNT];
 
 // Hough Transform specific variables
 int hough_optimal_threads[4] = {0, 0, 0, 0};
@@ -103,23 +108,22 @@ void * edgeDetection(void * arg) {
         }
     }
 
-    /*Blur
     for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
         for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
             int Gb = 
                     1  * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
-                    2  * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y - 1)) +
                     1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
                     1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
-                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y + 1)) +
                     1  * temp->at<uchar>(cv::Point(x + 1, y + 1)) +
-                    2  * temp->at<uchar>(cv::Point(x - 1, y    )) +
-                    4  * temp->at<uchar>(cv::Point(x    , y    )) +
-                    2  * temp->at<uchar>(cv::Point(x + 1, y    ));
-            Gb = Gb / 16;
+                    1  * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x    , y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y    ));
+            Gb = Gb / 9;
             temp->at<uchar>(cv::Point(x, y)) = Gb;
         }
-    }*/
+    }
 
     for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
         for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
@@ -141,7 +145,7 @@ void * edgeDetection(void * arg) {
 
             int G = (int)sqrt(Gx * Gx + Gy * Gy);
             
-            if(G > 150) {
+            if(G > 175) {
                 G = 255;
             }
             else {
@@ -153,6 +157,51 @@ void * edgeDetection(void * arg) {
 
     delete temp;
     
+    return NULL;
+}
+
+void * moravecCorner(void * arg) {
+    moravec_args * moravec_args_tid = (moravec_args *)arg;
+    cv::Mat * temp = new cv::Mat(moravec_args_tid->output_image->rows, moravec_args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+
+    for(int x = 0; x < edge_args_tid->input_image->cols; x++) {
+        for(int y = 0; y < edge_args_tid->input_image->rows; y++) {
+            cv::Vec3b pixel = edge_args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
+            temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);            
+        }
+    }
+
+    for(int x = 2; x < edge_args_tid->output_image->cols - 2; x++) {
+        for(int y = 2; y < edge_args_tid->output_image->rows - 2; y++) {
+            int Gy = 
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    -1 * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int Gx =
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    2  * temp->at<uchar>(cv::Point(x + 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int G = (int)sqrt(Gx * Gx + Gy * Gy);
+            
+            if(G > 175) {
+                G = 255;
+            }
+            else {
+                G = 0;
+            }
+            edge_args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
+        }
+    }
+
+    delete temp;
     return NULL;
 }
 
@@ -375,6 +424,7 @@ int main(int argc, char * argv[]) {
                 cv::Mat output(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
 
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
+                    // Edge detection
                     for(int idx = 0; idx < thread_count; idx++) {
                         int cols = image.cols/thread_count;
                         int remainder = 0;
@@ -405,11 +455,12 @@ int main(int argc, char * argv[]) {
                         }
 
                         //Test print if you just want the results of one image
-                        cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
+                        //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
                         
                         pthread_create(&tid[idx], NULL, edgeDetection, (void*)&edge_args_tid[idx]);
                     }
-
+                    
+                    // Merge image slices
                     for(int idx = 0; idx < thread_count; idx++) {
                         pthread_join(tid[idx], NULL);
                         int x_write = image.cols/thread_count * idx;
@@ -425,18 +476,73 @@ int main(int argc, char * argv[]) {
                         /*
                             Take note that memory is being freed here
                         */
-                        cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
+                        //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
                         
                         delete edge_args_tid[idx].input_image;
                         delete edge_args_tid[idx].output_image;
                     }
+
+                    // Moravec corner detection
+                    for(int idx = 0; idx < thread_count; idx++) {
+                        int cols = image.cols/thread_count;
+                        int remainder = 0;
+                        if(idx == thread_count - 1 && image.cols%thread_count != 0) {
+                            remainder = image.cols%thread_count;
+                        }
+                        
+                        /*
+                            Take note that memory is being allocated for the thread images here
+                        */
+                        moravec_args_tid[idx].input_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC3, cv::Scalar(0,0,0));
+                        moravec_args_tid[idx].output_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC1, cv::Scalar(0));
+                        
+                        int x_write = 2;
+                        for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
+                            int y_write = 2;
+                            for(int y = 0; y < image.rows; y++) {
+                                if(x == idx * cols && x - 2 >= 0) {
+                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
+                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 2, y));
+                                }
+                                if(x == idx * cols + cols + remainder - 1 && x + 2 <= image.cols) {
+                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));
+                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 2, y));    
+                                }
+                                moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                y_write++;
+                            }
+                            x_write++;
+                        }
+
+                        //Test print if you just want the results of one image
+                        cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *moravec_args_tid[idx].input_image);
+                        
+                        //pthread_create(&tid[idx], NULL, edgeDetection, (void*)&edge_args_tid[idx]);
+                    }
+                    
+                    // Merge image slices
+                    for(int idx = 0; idx < thread_count; idx++) {
+                        pthread_join(tid[idx], NULL);
+                        int x_write = image.cols/thread_count * idx;
+                        for(int x = 2; x < moravec_args_tid[idx].output_image->cols - 2; x++) {
+                            int y_write = 0;
+                            for(int y = 2; y < moravec_args_tid[idx].output_image->rows - 2; y++) {
+                                output.at<uchar>(cv::Point(x_write, y_write)) = moravec_args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
+                                y_write++;
+                            }
+                            x_write++;
+                        }
+
+                        /*
+                            Take note that memory is being freed here
+                        */
+                        //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
+                        
+                        delete moravec_args_tid[idx].input_image;
+                        delete moravec_args_tid[idx].output_image;
+                    }
                 }
-                
-                //Test print if you just want the results of one image
-                cv::imwrite("/home/nathanjf/testOutput.JPEG", output);
             }
-            //**TODO**
-            // CORNER
 
             //**TODO**
             // HOUGH TRANSFORM
@@ -446,6 +552,7 @@ int main(int argc, char * argv[]) {
 
         case ANIMATION_MODE :
             break;
+        
     }
         
     std::cout << "No errors so far" << std::endl;
