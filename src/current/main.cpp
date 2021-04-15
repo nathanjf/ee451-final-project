@@ -156,9 +156,12 @@ void * edgeDetection(void * arg) {
 void * moravecCorner(void * arg) {
     args * args_tid = (args *)arg;
     cv::Mat * temp = new cv::Mat(args_tid->output_image->rows, args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
-    int ** temp_int = new int*[args_tid->output_image->rows + 4];
-    for(int i = 0; i <  args_tid->output_image->rows + 4; i++) {
-        temp_int[i] = new int[args_tid->output_image->cols + 4];
+    int ** temp_int = new int*[args_tid->output_image->rows + 6];
+    for(int i = 0; i <  args_tid->output_image->rows + 6; i++) {
+        temp_int[i] = new int[args_tid->output_image->cols + 6];
+        for(int j = 0; j < args_tid->output_image->cols + 6; j++) {
+            temp_int[i][j] = 0;
+        }
     }
     
 
@@ -171,6 +174,7 @@ void * moravecCorner(void * arg) {
         }
     }
 
+    /*
     for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
         for(int y = 1; y < args_tid->output_image->rows - 2; y++) {
             int Gb = 
@@ -187,6 +191,7 @@ void * moravecCorner(void * arg) {
             temp->at<uchar>(cv::Point(x, y)) = Gb;
         }
     }
+    */
 
     for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
         for(int y = 2; y < args_tid->output_image->rows - 2; y++) {
@@ -201,10 +206,11 @@ void * moravecCorner(void * arg) {
                     temp->at<uchar>(cv::Point(x - 1, y    )) +
                     temp->at<uchar>(cv::Point(x    , y    )) +
                     temp->at<uchar>(cv::Point(x + 1, y    ));
+            local_intensity = local_intensity / 9;
             int min = INT32_MAX;
             for(int u = -1; u <= 1; u++) {
                 for(int v = -1; v <= 1; v++) {
-                    if(u != 0 && v != 0) {        
+                    if(!(u == 0 && v == 0)) {        
                         int shifted_intensity = 
                             temp->at<uchar>(cv::Point(x - 1 + u, y - 1 + v)) +
                             temp->at<uchar>(cv::Point(x     + u, y - 1 + v)) +
@@ -215,30 +221,31 @@ void * moravecCorner(void * arg) {
                             temp->at<uchar>(cv::Point(x - 1 + u, y     + v)) +
                             temp->at<uchar>(cv::Point(x     + u, y     + v)) +
                             temp->at<uchar>(cv::Point(x + 1 + u, y     + v));
-
+                        shifted_intensity = shifted_intensity / 9;
                         int E = (shifted_intensity - local_intensity) * (shifted_intensity - local_intensity);
-                        if(E < min) {
+                        if(E <= min) {
                             min = E;
                         }   
                     } 
                 }
 
             }
-            if(min < 15000) {
+            if(min < 150) {
                 min = 0;
             }
-            temp_int[y][x] = min;
+            temp_int[y + 3][x + 3] = min;
         }
     }
     for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
         for(int y = 2; y < args_tid->output_image->rows - 2; y++) {
             //Intensity of local window
             bool is_extrema = true;
-            int intensity = temp_int[y][x];
-            for(int u = -2; u <= 2; u++) {
-                for(int v = -2; v <= 2; v++) {
-                    if(u != 0 && v != 0) {        
-                        int shifted_intensity = temp_int[y + v][x + u];
+            int intensity = temp_int[y + 3][x + 3];
+            for(int u = -5; u <= 5; u++) {
+                for(int v = -5; v <= 5; v++) {
+                    if(!(u == 0 && v == 0))
+                    {        
+                        int shifted_intensity = temp_int[y + v + 3][x + u + 3];
                             
                         if(shifted_intensity >= intensity) {
                             is_extrema = false;
@@ -246,7 +253,7 @@ void * moravecCorner(void * arg) {
                     } 
                 }
             }
-            if(is_extrema) {
+            if(is_extrema == true) {
                 args_tid->output_image->at<uchar>(cv::Point(x, y)) = 255;
             }
             else {
@@ -256,7 +263,7 @@ void * moravecCorner(void * arg) {
     }
 
     delete temp;
-    for(int i = 0; i < args_tid->output_image->rows + 4; i++) {
+    for(int i = 0; i < args_tid->output_image->rows + 6; i++) {
         delete temp_int[i];
     }
     delete temp_int;
@@ -482,6 +489,8 @@ int main(int argc, char * argv[]) {
                 cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
                 cv::Mat output(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
 
+                cv::imwrite("/home/nathanjf/testInput.JPEG", image);
+
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
                     // Edge detection
                         for(int idx = 0; idx < thread_count; idx++) {
@@ -540,6 +549,7 @@ int main(int argc, char * argv[]) {
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
                         }
+                        cv::imwrite("/home/nathanjf/testOutputEdge.JPEG", output);
 
                     // Moravec corner detection
                         for(int idx = 0; idx < thread_count; idx++) {
@@ -596,13 +606,14 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
                         
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
 
                         }
 
+                        /*
                         for(int x = 0; x < output.cols; x++) {
                             for(int y = 0; y < output.rows; y++) {
                                 if(output.at<uchar>(cv::Point(x, y)) == 255) {
@@ -613,7 +624,8 @@ int main(int argc, char * argv[]) {
 
                             }
                         }
-                        cv::imwrite("/home/nathanjf/testOutput.JPEG", output);
+                        */
+                        cv::imwrite("/home/nathanjf/testOutputMoravec.JPEG", output);
                 }
             }
 
