@@ -44,6 +44,12 @@ pthread_mutex_t kmeansMutex;
 
 // Edge detection specific variables
 int edge_optimal_threads[4] = {0, 0, 0 ,0};
+struct edge_args {
+    cv::Mat * input_image;
+    cv::Mat * output_image;
+};
+edge_args edge_args_tid[MAX_THREAD_COUNT];
+
 
 // Moravec Corner detection specific variables
 int moravec_optimal_threads[4] = {0, 0, 0, 0};
@@ -82,6 +88,71 @@ void * kmeansClustering(void * arg) {
             pthread_mutex_unlock(&kmeansMutex);
         }
     }
+    return NULL;
+}
+
+void * edgeDetection(void * arg) {
+    edge_args * edge_args_tid = (edge_args *)arg;
+    cv::Mat * temp = new cv::Mat(edge_args_tid->output_image->rows, edge_args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+
+    // Convert to gray
+    for(int x = 0; x < edge_args_tid->input_image->cols; x++) {
+        for(int y = 0; y < edge_args_tid->input_image->rows; y++) {
+            cv::Vec3b pixel = edge_args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
+            temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);            
+        }
+    }
+
+    /*Blur
+    for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
+            int Gb = 
+                    1  * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    2  * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1)) +
+                    2  * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    4  * temp->at<uchar>(cv::Point(x    , y    )) +
+                    2  * temp->at<uchar>(cv::Point(x + 1, y    ));
+            Gb = Gb / 16;
+            temp->at<uchar>(cv::Point(x, y)) = Gb;
+        }
+    }*/
+
+    for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
+            int Gy = 
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    -1 * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int Gx =
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    -2 * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    -1 * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    2  * temp->at<uchar>(cv::Point(x + 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+
+            int G = (int)sqrt(Gx * Gx + Gy * Gy);
+            
+            if(G > 150) {
+                G = 255;
+            }
+            else {
+                G = 0;
+            }
+            edge_args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
+        }
+    }
+
+    delete temp;
+    
     return NULL;
 }
 
@@ -280,7 +351,7 @@ int main(int argc, char * argv[]) {
             image_paths_means.clear();
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
                 pthread_join(tid[i], NULL);
-                std::cout << kmeansArgs_tid[i].image_paths_means.size() << std::endl;
+                //std::cout << kmeansArgs_tid[i].image_paths_means.size() << std::endl;
                 for(image_path_mean_type image_path_mean: kmeansArgs_tid[i].image_paths_means)
                 {
                     image_paths_means.push_back(image_path_mean);
@@ -297,17 +368,11 @@ int main(int argc, char * argv[]) {
                 and every image in the vector will have the proper tagging
             */
 
-            struct edge_args {
-                cv::Mat * input_image;
-                cv::Mat * output_image;
-            };
-
-            edge_args edge_args_tid[MAX_THREAD_COUNT];
-
             //iterate over every image and perform the 3 transforms below
             for(image_path_mean_type image_path_mean: image_paths_means) {
                 std::string image_path = image_path_mean.first;
                 cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
+                cv::Mat output(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
 
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
                     for(int idx = 0; idx < thread_count; idx++) {
@@ -316,60 +381,65 @@ int main(int argc, char * argv[]) {
                         if(idx == thread_count - 1 && image.cols%thread_count != 0) {
                             remainder = image.cols%thread_count;
                         }
-                        std::cout << "Reached" << std::endl;
-                        edge_args_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
-                        edge_args_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
-                        for(int i = 0; i < image.rows; i++) {
-                            int j_write = 1;
-                            int i_write = i + 1;
-                            for(int j = idx * cols; j < idx * cols + cols + remainder; j++) {
-                                edge_args_tid[idx].input_image->at<cv::Vec3b>(i_write, j_write) = image.at<cv::Vec3b>(i, j);
-                                j_write++;
-                            }
-                        }
-                        //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
-
-                    }
-                    for(int idx = 0; idx < thread_count; idx++) {
                         
+                        /*
+                            Take note that memory is being allocated for the thread images here
+                        */
+                        edge_args_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
+                        edge_args_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC1, cv::Scalar(0));
+                        
+                        int x_write = 1;
+                        for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
+                            int y_write = 1;
+                            for(int y = 0; y < image.rows; y++) {
+                                if(x == idx * cols && x - 1 >= 0) {
+                                    edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
+                                }
+                                if(x == idx * cols + cols + remainder - 1 && x + 1 <= image.cols) {
+                                    edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
+                                }
+                                edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                y_write++;
+                            }
+                            x_write++;
+                        }
 
+                        //Test print if you just want the results of one image
+                        cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
+                        
+                        pthread_create(&tid[idx], NULL, edgeDetection, (void*)&edge_args_tid[idx]);
+                    }
+
+                    for(int idx = 0; idx < thread_count; idx++) {
+                        pthread_join(tid[idx], NULL);
+                        int x_write = image.cols/thread_count * idx;
+                        for(int x = 1; x < edge_args_tid[idx].output_image->cols - 1; x++) {
+                            int y_write = 0;
+                            for(int y = 1; y < edge_args_tid[idx].output_image->rows - 1; y++) {
+                                output.at<uchar>(cv::Point(x_write, y_write)) = edge_args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
+                                y_write++;
+                            }
+                            x_write++;
+                        }
+
+                        /*
+                            Take note that memory is being freed here
+                        */
+                        cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
                         
                         delete edge_args_tid[idx].input_image;
                         delete edge_args_tid[idx].output_image;
                     }
                 }
-
-                for(int i = 0; i < image.rows; i++) {
-                    for(int j = 0; j < image.cols; j++) {
-                        cv::Vec3b intensity = image.at<cv::Vec3b>(i, j);
-                        //image_b[i][j] = intensity.val[0];
-                        //image_g[i][j] = intensity.val[1];
-                        //image_r[i][j] = intensity.val[2];
-                        
-                        //test.at<uchar>(i, j) = color2gray(intensity.val[0], intensity.val[1], intensity.val[2]);
-                    }
-
-                }
-
-                //cv::imwrite("/home/nathanjf/test.JPEG", test);
-
-                //turn image into an int array
-
-                //**TODO**
-                // EDGE
-
-                    //Partition image into blocks
-                    //Partition images into columns to allow more thread control?
-
-                //**TODO**
-                // CORNER
-
-                //**TODO**
-                // HOUGH TRANSFORM
-
+                
+                //Test print if you just want the results of one image
+                cv::imwrite("/home/nathanjf/testOutput.JPEG", output);
             }
+            //**TODO**
+            // CORNER
 
-            break;
+            //**TODO**
+            // HOUGH TRANSFORM
 
         case TESTING_MODE :
             break;
@@ -378,13 +448,6 @@ int main(int argc, char * argv[]) {
             break;
     }
         
-            // processing(for each thread count)
-                // Edge detection
-                // Moravec Corner Detection
-                // Hough Transform
-
-                // Update image's optimal thread count's and execution times
-
     std::cout << "No errors so far" << std::endl;
 
     return 0;
