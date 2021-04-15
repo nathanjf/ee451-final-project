@@ -43,21 +43,14 @@ kmeansArgs kmeansArgs_tid[MAX_THREAD_COUNT];
 pthread_mutex_t kmeansMutex;
 
 // Edge detection specific variables
-int edge_optimal_threads[4] = {0, 0, 0 ,0};
-struct edge_args {
-    cv::Mat * input_image;
-    cv::Mat * output_image;
-};
-edge_args edge_args_tid[MAX_THREAD_COUNT];
-
-
 // Moravec Corner detection specific variables
+int edge_optimal_threads[4] = {0, 0, 0 ,0};
 int moravec_optimal_threads[4] = {0, 0, 0, 0};
-struct moravec_args {
+struct args {
     cv::Mat * input_image;
     cv::Mat * output_image;
 };
-moravec_args moravec_args_tid[MAX_THREAD_COUNT];
+args args_tid[MAX_THREAD_COUNT];
 
 // Hough Transform specific variables
 int hough_optimal_threads[4] = {0, 0, 0, 0};
@@ -97,19 +90,19 @@ void * kmeansClustering(void * arg) {
 }
 
 void * edgeDetection(void * arg) {
-    edge_args * edge_args_tid = (edge_args *)arg;
-    cv::Mat * temp = new cv::Mat(edge_args_tid->output_image->rows, edge_args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+    args * args_tid = (args *)arg;
+    cv::Mat * temp = new cv::Mat(args_tid->output_image->rows, args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
 
     // Convert to gray
-    for(int x = 0; x < edge_args_tid->input_image->cols; x++) {
-        for(int y = 0; y < edge_args_tid->input_image->rows; y++) {
-            cv::Vec3b pixel = edge_args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
+    for(int x = 0; x < args_tid->input_image->cols; x++) {
+        for(int y = 0; y < args_tid->input_image->rows; y++) {
+            cv::Vec3b pixel = args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
             temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);            
         }
     }
 
-    for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
-        for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
+    for(int x = 1; x < args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 1; y++) {
             int Gb = 
                     1  * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
                     1  * temp->at<uchar>(cv::Point(x    , y - 1)) +
@@ -125,8 +118,8 @@ void * edgeDetection(void * arg) {
         }
     }
 
-    for(int x = 1; x < edge_args_tid->output_image->cols - 1; x++) {
-        for(int y = 1; y < edge_args_tid->output_image->rows - 1; y++) {
+    for(int x = 1; x < args_tid->output_image->cols - 1; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 1; y++) {
             int Gy = 
                     -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
                     -2 * temp->at<uchar>(cv::Point(x    , y - 1)) +
@@ -151,7 +144,7 @@ void * edgeDetection(void * arg) {
             else {
                 G = 0;
             }
-            edge_args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
+            args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
         }
     }
 
@@ -161,47 +154,113 @@ void * edgeDetection(void * arg) {
 }
 
 void * moravecCorner(void * arg) {
-    moravec_args * moravec_args_tid = (moravec_args *)arg;
-    cv::Mat * temp = new cv::Mat(moravec_args_tid->output_image->rows, moravec_args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+    args * args_tid = (args *)arg;
+    cv::Mat * temp = new cv::Mat(args_tid->output_image->rows, args_tid->output_image->cols, CV_8UC1, cv::Scalar(0));
+    int ** temp_int = new int*[args_tid->output_image->rows + 4];
+    for(int i = 0; i <  args_tid->output_image->rows + 4; i++) {
+        temp_int[i] = new int[args_tid->output_image->cols + 4];
+    }
+    
 
-    for(int x = 0; x < edge_args_tid->input_image->cols; x++) {
-        for(int y = 0; y < edge_args_tid->input_image->rows; y++) {
-            cv::Vec3b pixel = edge_args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
-            temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);            
+    // Convert to gray
+    for(int x = 0; x < args_tid->input_image->cols; x++) {
+        for(int y = 0; y < args_tid->input_image->rows; y++) {
+            cv::Vec3b pixel = args_tid->input_image->at<cv::Vec3b>(cv::Point(x, y));
+            temp->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);    
+            //args_tid->output_image->at<uchar>(cv::Point(x, y)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);        
         }
     }
 
-    for(int x = 2; x < edge_args_tid->output_image->cols - 2; x++) {
-        for(int y = 2; y < edge_args_tid->output_image->rows - 2; y++) {
-            int Gy = 
-                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
-                    -2 * temp->at<uchar>(cv::Point(x    , y - 1)) +
-                    -1 * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
-                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
-                    2  * temp->at<uchar>(cv::Point(x    , y + 1)) +
-                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
-
-            int Gx =
-                    -1 * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
-                    -2 * temp->at<uchar>(cv::Point(x - 1, y    )) +
-                    -1 * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+    for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
+        for(int y = 1; y < args_tid->output_image->rows - 2; y++) {
+            int Gb = 
+                    1  * temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y - 1)) +
                     1  * temp->at<uchar>(cv::Point(x + 1, y - 1)) +
-                    2  * temp->at<uchar>(cv::Point(x + 1, y    )) +
-                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1));
+                    1  * temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y + 1)) +
+                    1  * temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    1  * temp->at<uchar>(cv::Point(x    , y    )) +
+                    1  * temp->at<uchar>(cv::Point(x + 1, y    ));
+            Gb = Gb / 9;
+            temp->at<uchar>(cv::Point(x, y)) = Gb;
+        }
+    }
 
-            int G = (int)sqrt(Gx * Gx + Gy * Gy);
-            
-            if(G > 175) {
-                G = 255;
+    for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
+        for(int y = 2; y < args_tid->output_image->rows - 2; y++) {
+            //Intensity of local window
+            int local_intensity = 
+                    temp->at<uchar>(cv::Point(x - 1, y - 1)) +
+                    temp->at<uchar>(cv::Point(x    , y - 1)) +
+                    temp->at<uchar>(cv::Point(x + 1, y - 1)) +
+                    temp->at<uchar>(cv::Point(x - 1, y + 1)) +
+                    temp->at<uchar>(cv::Point(x    , y + 1)) +
+                    temp->at<uchar>(cv::Point(x + 1, y + 1)) +
+                    temp->at<uchar>(cv::Point(x - 1, y    )) +
+                    temp->at<uchar>(cv::Point(x    , y    )) +
+                    temp->at<uchar>(cv::Point(x + 1, y    ));
+            int min = INT32_MAX;
+            for(int u = -1; u <= 1; u++) {
+                for(int v = -1; v <= 1; v++) {
+                    if(u != 0 && v != 0) {        
+                        int shifted_intensity = 
+                            temp->at<uchar>(cv::Point(x - 1 + u, y - 1 + v)) +
+                            temp->at<uchar>(cv::Point(x     + u, y - 1 + v)) +
+                            temp->at<uchar>(cv::Point(x + 1 + v, y - 1 + v)) +
+                            temp->at<uchar>(cv::Point(x - 1 + u, y + 1 + v)) +
+                            temp->at<uchar>(cv::Point(x     + u, y + 1 + v)) +
+                            temp->at<uchar>(cv::Point(x + 1 + u, y + 1 + v)) +
+                            temp->at<uchar>(cv::Point(x - 1 + u, y     + v)) +
+                            temp->at<uchar>(cv::Point(x     + u, y     + v)) +
+                            temp->at<uchar>(cv::Point(x + 1 + u, y     + v));
+
+                        int E = (shifted_intensity - local_intensity) * (shifted_intensity - local_intensity);
+                        if(E < min) {
+                            min = E;
+                        }   
+                    } 
+                }
+
+            }
+            if(min < 15000) {
+                min = 0;
+            }
+            temp_int[y][x] = min;
+        }
+    }
+    for(int x = 2; x < args_tid->output_image->cols - 2; x++) {
+        for(int y = 2; y < args_tid->output_image->rows - 2; y++) {
+            //Intensity of local window
+            bool is_extrema = true;
+            int intensity = temp_int[y][x];
+            for(int u = -2; u <= 2; u++) {
+                for(int v = -2; v <= 2; v++) {
+                    if(u != 0 && v != 0) {        
+                        int shifted_intensity = temp_int[y + v][x + u];
+                            
+                        if(shifted_intensity >= intensity) {
+                            is_extrema = false;
+                        }   
+                    } 
+                }
+            }
+            if(is_extrema) {
+                args_tid->output_image->at<uchar>(cv::Point(x, y)) = 255;
             }
             else {
-                G = 0;
+                args_tid->output_image->at<uchar>(cv::Point(x, y)) = 0;
             }
-            edge_args_tid->output_image->at<uchar>(cv::Point(x, y)) = G;
         }
     }
 
     delete temp;
+    for(int i = 0; i < args_tid->output_image->rows + 4; i++) {
+        delete temp_int[i];
+    }
+    delete temp_int;
+
     return NULL;
 }
 
@@ -425,122 +484,136 @@ int main(int argc, char * argv[]) {
 
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
                     // Edge detection
-                    for(int idx = 0; idx < thread_count; idx++) {
-                        int cols = image.cols/thread_count;
-                        int remainder = 0;
-                        if(idx == thread_count - 1 && image.cols%thread_count != 0) {
-                            remainder = image.cols%thread_count;
-                        }
-                        
-                        /*
-                            Take note that memory is being allocated for the thread images here
-                        */
-                        edge_args_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
-                        edge_args_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC1, cv::Scalar(0));
-                        
-                        int x_write = 1;
-                        for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
-                            int y_write = 1;
-                            for(int y = 0; y < image.rows; y++) {
-                                if(x == idx * cols && x - 1 >= 0) {
-                                    edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
-                                }
-                                if(x == idx * cols + cols + remainder - 1 && x + 1 <= image.cols) {
-                                    edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
-                                }
-                                edge_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
-                                y_write++;
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            int cols = image.cols/thread_count;
+                            int remainder = 0;
+                            if(idx == thread_count - 1 && image.cols%thread_count != 0) {
+                                remainder = image.cols%thread_count;
                             }
-                            x_write++;
-                        }
-
-                        //Test print if you just want the results of one image
-                        //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].input_image);
-                        
-                        pthread_create(&tid[idx], NULL, edgeDetection, (void*)&edge_args_tid[idx]);
-                    }
-                    
-                    // Merge image slices
-                    for(int idx = 0; idx < thread_count; idx++) {
-                        pthread_join(tid[idx], NULL);
-                        int x_write = image.cols/thread_count * idx;
-                        for(int x = 1; x < edge_args_tid[idx].output_image->cols - 1; x++) {
-                            int y_write = 0;
-                            for(int y = 1; y < edge_args_tid[idx].output_image->rows - 1; y++) {
-                                output.at<uchar>(cv::Point(x_write, y_write)) = edge_args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
-                                y_write++;
+                            
+                            /*
+                                Take note that memory is being allocated for the thread images here
+                            */
+                            args_tid[idx].input_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC3, cv::Scalar(0,0,0));
+                            args_tid[idx].output_image = new cv::Mat(image.rows + 2, cols + remainder + 2, CV_8UC1, cv::Scalar(0));
+                            
+                            int x_write = 1;
+                            for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
+                                int y_write = 1;
+                                for(int y = 0; y < image.rows; y++) {
+                                    if(x == idx * cols && x - 1 >= 0) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
+                                    }
+                                    if(x == idx * cols + cols + remainder - 1 && x + 1 <= image.cols) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
+                                    }
+                                    args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                    y_write++;
+                                }
+                                x_write++;
                             }
-                            x_write++;
-                        }
 
-                        /*
-                            Take note that memory is being freed here
-                        */
-                        //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
+                            //Test print if you just want the results of one image
+                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
+                            
+                            pthread_create(&tid[idx], NULL, edgeDetection, (void*)&args_tid[idx]);
+                        }
                         
-                        delete edge_args_tid[idx].input_image;
-                        delete edge_args_tid[idx].output_image;
-                    }
+                        // Merge image slices
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            pthread_join(tid[idx], NULL);
+                            int x_write = image.cols/thread_count * idx;
+                            for(int x = 1; x < args_tid[idx].output_image->cols - 1; x++) {
+                                int y_write = 0;
+                                for(int y = 1; y < args_tid[idx].output_image->rows - 1; y++) {
+                                    output.at<uchar>(cv::Point(x_write, y_write)) = args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
+                                    y_write++;
+                                }
+                                x_write++;
+                            }
+
+                            /*
+                                Take note that memory is being freed here
+                            */
+                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                            
+                            delete args_tid[idx].input_image;
+                            delete args_tid[idx].output_image;
+                        }
 
                     // Moravec corner detection
-                    for(int idx = 0; idx < thread_count; idx++) {
-                        int cols = image.cols/thread_count;
-                        int remainder = 0;
-                        if(idx == thread_count - 1 && image.cols%thread_count != 0) {
-                            remainder = image.cols%thread_count;
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            int cols = image.cols/thread_count;
+                            int remainder = 0;
+                            if(idx == thread_count - 1 && image.cols%thread_count != 0) {
+                                remainder = image.cols%thread_count;
+                            }
+                            
+                            /*
+                                Take note that memory is being allocated for the thread images here
+                            */
+
+
+                            args_tid[idx].input_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC3, cv::Scalar(0,0,0));
+                            args_tid[idx].output_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC1, cv::Scalar(0));
+                            
+                            int x_write = 2;
+                            for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
+                                int y_write = 2;
+                                for(int y = 0; y < image.rows; y++) {
+                                    if(x == idx * cols && x - 2 >= 0) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 2, y));
+                                    }
+                                    if(x == idx * cols + cols + remainder - 1 && x + 2 < image.cols) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 2, y));    
+                                    }
+                                    args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                    y_write++;
+                                }
+                                x_write++;
+                            }
+                            //Test print if you just want the results of one image
+                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
+                            
+                            pthread_create(&tid[idx], NULL, moravecCorner, (void*)&args_tid[idx]);
                         }
                         
-                        /*
-                            Take note that memory is being allocated for the thread images here
-                        */
-                        moravec_args_tid[idx].input_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC3, cv::Scalar(0,0,0));
-                        moravec_args_tid[idx].output_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC1, cv::Scalar(0));
-                        
-                        int x_write = 2;
-                        for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
-                            int y_write = 2;
-                            for(int y = 0; y < image.rows; y++) {
-                                if(x == idx * cols && x - 2 >= 0) {
-                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
-                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 2, y));
+                        // Merge image slices
+                        for(int idx = 0; idx < thread_count; idx++) {
+                            pthread_join(tid[idx], NULL);
+                            int x_write = image.cols/thread_count * idx;
+                            for(int x = 2; x < args_tid[idx].output_image->cols - 2; x++) {
+                                int y_write = 0;
+                                for(int y = 2; y < args_tid[idx].output_image->rows - 2; y++) {
+                                    output.at<uchar>(cv::Point(x_write, y_write)) = args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
+                                    y_write++;
                                 }
-                                if(x == idx * cols + cols + remainder - 1 && x + 2 <= image.cols) {
-                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));
-                                    moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 2, y));    
-                                }
-                                moravec_args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
-                                y_write++;
+                                x_write++;
                             }
-                            x_write++;
+
+                            /*
+                                Take note that memory is being freed here
+                            */
+                            cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
+                        
+                            delete args_tid[idx].input_image;
+                            delete args_tid[idx].output_image;
+
                         }
 
-                        //Test print if you just want the results of one image
-                        cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *moravec_args_tid[idx].input_image);
-                        
-                        //pthread_create(&tid[idx], NULL, edgeDetection, (void*)&edge_args_tid[idx]);
-                    }
-                    
-                    // Merge image slices
-                    for(int idx = 0; idx < thread_count; idx++) {
-                        pthread_join(tid[idx], NULL);
-                        int x_write = image.cols/thread_count * idx;
-                        for(int x = 2; x < moravec_args_tid[idx].output_image->cols - 2; x++) {
-                            int y_write = 0;
-                            for(int y = 2; y < moravec_args_tid[idx].output_image->rows - 2; y++) {
-                                output.at<uchar>(cv::Point(x_write, y_write)) = moravec_args_tid[idx].output_image->at<uchar>(cv::Point(x, y));
-                                y_write++;
-                            }
-                            x_write++;
-                        }
+                        for(int x = 0; x < output.cols; x++) {
+                            for(int y = 0; y < output.rows; y++) {
+                                if(output.at<uchar>(cv::Point(x, y)) == 255) {
+                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[0] = 0;
+                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                                    image.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 255;
+                                }
 
-                        /*
-                            Take note that memory is being freed here
-                        */
-                        //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *edge_args_tid[idx].output_image);
-                        
-                        delete moravec_args_tid[idx].input_image;
-                        delete moravec_args_tid[idx].output_image;
-                    }
+                            }
+                        }
+                        cv::imwrite("/home/nathanjf/testOutput.JPEG", output);
                 }
             }
 
