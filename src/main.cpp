@@ -2061,7 +2061,7 @@ int main(int argc, char * argv[]) {
                                     cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + "accum" + std::to_string(accum_sequence) + ".JPEG", accumulator_image);
                                     accum_sequence++;
                                 }
-                                if(sequence_number % 100 == 0) {
+                                if(sequence_number % 25 == 0) {
                                     cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + std::to_string(sequence_title) + ".JPEG", temp3);
                                     sequence_title++;
                                 }
