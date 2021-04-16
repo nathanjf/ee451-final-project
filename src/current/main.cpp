@@ -7,6 +7,8 @@
 
 #include <pthread.h>
 
+#include <chrono>
+
 #include <iostream>
 #include <fstream>
 
@@ -145,7 +147,7 @@ void * edgeDetection(void * arg) {
 
             int G = (int)sqrt(Gx * Gx + Gy * Gy);
             
-            if(G > 175) {
+            if(G > 150) {
                 G = 255;
             }
             else {
@@ -327,7 +329,7 @@ void * houghTransform(void * arg) {
 
             int G = (int)sqrt(Gx * Gx + Gy * Gy);
             
-            if(G > 175) {
+            if(G > 150) {
                 G = 255;
             }
             else {
@@ -471,7 +473,6 @@ int main(int argc, char * argv[]) {
             /*
                 If no images were found print an error statement
             */
-
             if(image_paths.size() == 0) {
                 //**TODO**
                 //No JPEGs in directory
@@ -488,7 +489,6 @@ int main(int argc, char * argv[]) {
                 tagging each image with their pixel counts and their closest
                 initial centroid
             */
-
             for (std::string image_path : image_paths) {
                 
                 cv::Mat image = cv::imread(image_path);
@@ -506,17 +506,10 @@ int main(int argc, char * argv[]) {
                 image_paths_means.push_back(image_path_mean);
             }
 
-            for(int i = 0; i < 4; i++) {
-                std::cout << kmeans[i] << " ";
-            }
-            std::cout << std::endl;
-
             /*
                 Partition the vector to the threads and spawn all the threads
                 If there is a remainder in the partition allocate those to the last thread
             */
-
-
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
                 if(i < MAX_THREAD_COUNT - 1) {
                     int offset = image_paths_means.size()/MAX_THREAD_COUNT;
@@ -547,38 +540,34 @@ int main(int argc, char * argv[]) {
                 Clear the current values in the vector and write the new values
                 the threads have calculated
             */
-
             image_paths_means.clear();
             for(int i = 0; i < MAX_THREAD_COUNT; i++) {
                 pthread_join(tid[i], NULL);
-                //std::cout << kmeansArgs_tid[i].image_paths_means.size() << std::endl;
                 for(image_path_mean_type image_path_mean: kmeansArgs_tid[i].image_paths_means)
                 {
                     image_paths_means.push_back(image_path_mean);
                 }
             }
 
-            for(int i = 0; i < 4; i++) {
-                std::cout << kmeans[i] << " ";
-            }
-            std::cout << std::endl;
-
-            /*
-                At this point the kmeans are calculated based off the seed centroids
-                and every image in the vector will have the proper tagging
-            */
-
             //iterate over every image and perform the 3 transforms below
             for(image_path_mean_type image_path_mean: image_paths_means) {
+                
                 std::string image_path = image_path_mean.first;
                 cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
                 cv::Mat output(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
                 int d = (int)sqrt((double)(image.cols * image.cols + image.rows * image.rows));
 
-                cv::imwrite("/home/nathanjf/testInput.JPEG", image);
+                std::chrono::high_resolution_clock::time_point start;
+                std::chrono::high_resolution_clock::time_point end;
+                std::chrono::duration<double> elaps;
 
+                // Run for every thread count
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
+                    std::cout << "Durations: " << thread_count << std::endl;
                     // Edge detection
+                        start = std::chrono::high_resolution_clock::now();
+                        
+                        // Create threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             int cols = image.cols/thread_count;
                             int remainder = 0;
@@ -640,14 +629,10 @@ int main(int argc, char * argv[]) {
                                 }
                                 x_write++;
                             }
-
-                            //Test print if you just want the results of one image
-                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
-                            
                             pthread_create(&tid[idx], NULL, edgeDetection, (void*)&args_tid[idx]);
                         }
                         
-                        // Merge image slices
+                        // Join threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             pthread_join(tid[idx], NULL);
                             int x_write = image.cols/thread_count * idx;
@@ -663,14 +648,17 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
-                            
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
                         }
-                        cv::imwrite("/home/nathanjf/testOutputEdge.JPEG", output);
 
+                        end = std::chrono::high_resolution_clock::now();;
+                        elaps = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+                        std::cout << elaps.count() << std::endl;
                     // Moravec corner detection
+                        start = std::chrono::high_resolution_clock::now();;
+                        
+                        // Create threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             int cols = image.cols/thread_count;
                             int remainder = 0;
@@ -681,7 +669,6 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being allocated for the thread images here
                             */
-
 
                             args_tid[idx].input_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC3, cv::Scalar(0,0,0));
                             args_tid[idx].output_image = new cv::Mat(image.rows + 2 + 2, cols + remainder + 2 + 2, CV_8UC1, cv::Scalar(0));
@@ -755,13 +742,10 @@ int main(int argc, char * argv[]) {
                                 }
                                 x_write++;
                             }
-                            //Test print if you just want the results of one image
-                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
-                            
                             pthread_create(&tid[idx], NULL, moravecCorner, (void*)&args_tid[idx]);
                         }
                         
-                        // Merge image slices
+                        // Join threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             pthread_join(tid[idx], NULL);
                             int x_write = image.cols/thread_count * idx;
@@ -777,16 +761,27 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
-                        
                             delete args_tid[idx].input_image;
                             delete args_tid[idx].output_image;
 
                         }
 
-                        cv::imwrite("/home/nathanjf/testOutputMoravec.JPEG", output);
-
+                        end = std::chrono::high_resolution_clock::now();;
+                        elaps = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+                        std::cout << elaps.count() << std::endl;
                     // Hough Transform
+                        start = std::chrono::high_resolution_clock::now();;
+                        
+                        // Create accumulator
+                        int ** accumulator_space = new int*[180];
+                        for(int i = 0; i < 180; i++) {
+                            accumulator_space[i] = new int[2*d];
+                            for(int j = 0; j < 2*d; j++) {
+                                accumulator_space[i][j] = 0;
+                            }
+                        }
+                        
+                        // Create threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             int cols = image.cols/thread_count;
                             int remainder = 0;
@@ -855,21 +850,10 @@ int main(int argc, char * argv[]) {
                                 }
                                 x_write++;
                             }
-                            //Test print if you just want the results of one image
-                            //cv::imwrite("/home/nathanjf/test" + std::to_string(idx) + ".JPEG", *args_tid[idx].input_image);
-                            
                             pthread_create(&tid[idx], NULL, houghTransform, (void*)&args_hough_tid[idx]);
                         }
                         
-                        // Merge image slices
-                        int ** accumulator_space = new int*[180];
-                        for(int i = 0; i < 180; i++) {
-                            accumulator_space[i] = new int[2*d];
-                            for(int j = 0; j < 2*d; j++) {
-                                accumulator_space[i][j] = 0;
-                            }
-                        }
-                                                
+                        // Join threads
                         for(int idx = 0; idx < thread_count; idx++) {
                             pthread_join(tid[idx], NULL);
                             int x_write = image.cols/thread_count * idx;
@@ -890,8 +874,7 @@ int main(int argc, char * argv[]) {
                             /*
                                 Take note that memory is being freed here
                             */
-                            //cv::imwrite("/home/nathanjf/testOutput" + std::to_string(idx) + ".JPEG", *args_tid[idx].output_image);
-                        
+
                             delete args_hough_tid[idx].input_image;
                             delete args_hough_tid[idx].output_image;
                             for(int i = 0; i <  180; i++) {
@@ -899,6 +882,8 @@ int main(int argc, char * argv[]) {
                             }
                             delete args_hough_tid[idx].accumulator_space;
                         }
+                        
+                        /*
                         // Turn accumulator into image
                         int max = 0;
                         int max_theta = 0;
@@ -914,9 +899,6 @@ int main(int argc, char * argv[]) {
                             }
                         }
 
-                        //max_theta = 59;
-                        //max_p = 193;
-
                         double a = cos((double)max_theta * 3.14/180.0);
                         double b = sin((double)max_theta * 3.14/180.0);
                         double x0 = (a * (double)max_p); //+ image.cols/2;
@@ -926,15 +908,24 @@ int main(int argc, char * argv[]) {
                         int x2 = (int)(x0 - 1000.0 * (-b));
                         int y2 = (int)(y0 - 1000.0 * (a));
 
-                        for(int i = 0; i <  180; i++) {
+
+
+                        //cv::Mat temp = image.clone();
+                        //cv::line(temp, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0,0,255), 3);
+                        //cv::imwrite("/home/nathanjf/testOutputHough.JPEG", houghOutput);
+                        //cv::imwrite("/home/nathanjf/testOutputHoughVisual.JPEG", temp);
+                        */
+                        
+                        // Free accumulator
+                        for(int i = 0; i < 180; i++) {
                             delete accumulator_space[i];
                         }
                         delete accumulator_space;
-
-                        cv::Mat temp = image.clone();
-                        cv::line(temp, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0,0,255), 3);
-                        //cv::imwrite("/home/nathanjf/testOutputHough.JPEG", houghOutput);
-                        cv::imwrite("/home/nathanjf/testOutputHoughVisual.JPEG", temp);
+        
+                        end = std::chrono::high_resolution_clock::now();;
+                        elaps = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+                        std::cout << elaps.count() << std::endl;
+                        std::cout << std::endl;
                 }
             }
 
