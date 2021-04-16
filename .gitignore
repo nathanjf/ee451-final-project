@@ -2,3 +2,9 @@
 src/v0.1/main
 
 .vscode/
+
+output/testoutput/
+
+output/
+
+src/main
