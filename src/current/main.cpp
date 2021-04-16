@@ -25,7 +25,6 @@
 
 typedef std::pair<std::string, std::pair<int, int>> image_path_mean_type;
 
-
 // Global variables
 std::vector<std::string> image_paths;
 std::vector<image_path_mean_type> image_paths_means;
@@ -691,14 +690,66 @@ int main(int argc, char * argv[]) {
                             for(int x = idx * cols; x < idx * cols + cols + remainder; x++) {
                                 int y_write = 2;
                                 for(int y = 0; y < image.rows; y++) {
+                                    if(y == 0) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write - 2)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    
+                                    }
+                                    if(y == image.rows - 2) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));        
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write + 2)) = image.at<cv::Vec3b>(cv::Point(x, y));        
+                                    }
+
                                     if(x == idx * cols && x - 2 >= 0) {
                                         args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 1, y));
                                         args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x - 2, y));
                                     }
-                                    if(x == idx * cols + cols + remainder - 1 && x + 2 < image.cols) {
-                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));
+                                    else if (x == idx * cols && !(x - 2 >= 0)){
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+                                    
+                                    if(x == idx * cols + cols + remainder - 2 && x + 2 < image.cols) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 1, y));    
                                         args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x + 2, y));    
                                     }
+
+                                    if(x == idx * cols + cols + remainder - 2 && !(x + 2 < image.cols)) {
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                        args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                    }
+
+                                    //Top corner
+                                    if(y == 0){
+                                        if(x == idx * cols) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write - 2)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write - 2)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        
+                                        }
+                                        if(x == idx * cols + cols + remainder - 2) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write - 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write - 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write - 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    } 
+                                    if(y == image.rows - 2) {
+                                        if(x == idx * cols) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 1, y_write + 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write + 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write - 2, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                        if(x == idx * cols + cols + remainder - 2) {
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 1, y_write + 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write + 2)) = image.at<cv::Vec3b>(cv::Point(x, y));
+                                            args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write + 2, y_write + 1)) = image.at<cv::Vec3b>(cv::Point(x, y));    
+                                        }
+                                    }
+
                                     args_tid[idx].input_image->at<cv::Vec3b>(cv::Point(x_write, y_write)) = image.at<cv::Vec3b>(cv::Point(x, y));
                                     y_write++;
                                 }
