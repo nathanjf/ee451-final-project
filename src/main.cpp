@@ -19,7 +19,7 @@
 #define ANIMATION_MODE  3
 
 // Config values
-#define TOTAL_CONFIG_LINES 10
+#define TOTAL_CONFIG_LINES 12
 #define UNSET              "NULL"
 
 // Program values
@@ -690,11 +690,13 @@ int main(int argc, char * argv[]) {
 
     std::string TEST_OUTPUT_DIRECTORY       = UNSET;
 
-    std::string ANIMATION_IMAGE_DIRECTORY           = UNSET;
+    std::string ANIMATION_IMAGE_PATH_EDGE           = UNSET;
+    std::string ANIMATION_IMAGE_PATH_MORAVEC        = UNSET;
+    std::string ANIMATION_IMAGE_PATH_HOUGH          = UNSET;
+    
     std::string ANIMATION_OUTPUT_DIRECTORY_EDGE     = UNSET;
     std::string ANIMATION_OUTPUT_DIRECTORY_MORAVEC  = UNSET;
     std::string ANIMATION_OUTPUT_DIRECTORY_HOUGH    = UNSET;
-    
     
     if(argc == 3) {
         /*
@@ -752,8 +754,16 @@ int main(int argc, char * argv[]) {
                     TEST_OUTPUT_DIRECTORY = line.substr(line.find("=") + 1);
                     VALID_CONFIG_LINES++;
                 }
-                if(setting_prefix == "ANIMATION_IMAGE_DIRECTORY") {
-                    ANIMATION_IMAGE_DIRECTORY = line.substr(line.find("=") + 1);
+                if(setting_prefix == "ANIMATION_IMAGE_PATH_EDGE") {
+                    ANIMATION_IMAGE_PATH_EDGE = line.substr(line.find("=") + 1);
+                    VALID_CONFIG_LINES++;
+                }
+                if(setting_prefix == "ANIMATION_IMAGE_PATH_MORAVEC") {
+                    ANIMATION_IMAGE_PATH_MORAVEC = line.substr(line.find("=") + 1);
+                    VALID_CONFIG_LINES++;
+                }
+                if(setting_prefix == "ANIMATION_IMAGE_PATH_HOUGH") {
+                    ANIMATION_IMAGE_PATH_HOUGH = line.substr(line.find("=") + 1);
                     VALID_CONFIG_LINES++;
                 }
                 if(setting_prefix == "ANIMATION_OUTPUT_DIRECTORY_EDGE") {
@@ -790,6 +800,24 @@ int main(int argc, char * argv[]) {
                 if(TEST_OUTPUT_DIRECTORY == UNSET) {
                     std::cout << "INVALID CONFIG LINE: \"TEST_OUTPUT_DIRECTORY\" is not set" << std::endl;
                 }
+                if(ANIMATION_IMAGE_PATH_EDGE == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_IMAGE_PATH_EDGE\" is not set" << std::endl;
+                }
+                if(ANIMATION_IMAGE_PATH_MORAVEC == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_IMAGE_PATH_MORAVEC\" is not set" << std::endl;
+                }
+                if(ANIMATION_IMAGE_PATH_HOUGH == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_IMAGE_PATH_HOUGH\" is not set" << std::endl;
+                }
+                if(ANIMATION_OUTPUT_DIRECTORY_EDGE == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_OUTPUT_DIRECTORY_EDGE\" is not set" << std::endl;
+                }
+                if(ANIMATION_OUTPUT_DIRECTORY_MORAVEC == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_OUTPUT_DIRECTORY_MORAVEC\" is not set" << std::endl;
+                }
+                if(ANIMATION_OUTPUT_DIRECTORY_HOUGH == UNSET) {
+                    std::cout << "INVALID CONFIG LINE: \"ANIMATION_OUTPUT_DIRECTORY_HOUGH\" is not set" << std::endl;
+                }
             
                 //**TODO**
                 // Add a check for the remaining settings
@@ -803,6 +831,13 @@ int main(int argc, char * argv[]) {
             std::cout << "\"TEST_IMAGE_DIRECTORY\" is set to: " << TEST_IMAGE_DIRECTORY << std::endl;
             std::cout << "\"TEST_DATA_PATH\" is set to: " << TEST_DATA_PATH << std::endl;
             std::cout << "\"TEST_OUTPUT_DIRECTORY\" is set to: " << TEST_DATA_PATH << std::endl;
+            
+            std::cout << "\"ANIMATION_IMAGE_PATH_EDGE\" is set to: " << ANIMATION_IMAGE_PATH_EDGE << std::endl;
+            std::cout << "\"ANIMATION_IMAGE_PATH_MORAVEC\" is set to: " << ANIMATION_IMAGE_PATH_MORAVEC << std::endl;
+            std::cout << "\"ANIMATION_IMAGE_PATH_HOUGH\" is set to: " << ANIMATION_IMAGE_PATH_HOUGH << std::endl;
+            std::cout << "\"ANIMATION_OUTPUT_DIRECTORY_EDGE\" is set to: " << ANIMATION_OUTPUT_DIRECTORY_EDGE << std::endl;
+            std::cout << "\"ANIMATION_OUTPUT_DIRECTORY_MORAVEC\" is set to: " << ANIMATION_OUTPUT_DIRECTORY_MORAVEC << std::endl;
+            std::cout << "\"ANIMATION_OUTPUT_DIRECTORY_HOUGH\" is set to: " << ANIMATION_OUTPUT_DIRECTORY_HOUGH << std::endl;
             
             //**TODO**
             // Print the remaining config lines aswell
@@ -976,7 +1011,7 @@ int main(int argc, char * argv[]) {
 
                 // Run for every thread count
                 for(int thread_count = 1; thread_count <= MAX_THREAD_COUNT; thread_count++) {
-                    for(int trial = 1; trial <= 3; trial++) {
+                    for(int trial = 1; trial <= 2; trial++) {
                         // Edge detection
                             start = std::chrono::high_resolution_clock::now();
 
@@ -1303,12 +1338,15 @@ int main(int argc, char * argv[]) {
                             
                             if(trial == 1 && thread_count == MAX_THREAD_COUNT - 1) {
                                 // Turn accumulator into image
-                                cv::Mat accumulator(2 * d, 180, CV_8UC3, cv::Scalar(0,0,0));
+                                cv::Mat accumulator(2 * d, 180, CV_8UC1, cv::Scalar(0,0,0));
                                 for(int x = 0; x < 180; x++) {
                                     for(int y = 0; y < 2 * d; y++) {
-                                        accumulator.at<cv::Vec3b>(cv::Point(x,y)).val[0] = accumulator_space[x][y]/2;
-                                        accumulator.at<cv::Vec3b>(cv::Point(x,y)).val[1] = accumulator_space[x][y]/2;
-                                        accumulator.at<cv::Vec3b>(cv::Point(x,y)).val[2] = accumulator_space[x][y]/2;
+                                        if(accumulator_space[x][y] > 255) {
+                                            accumulator.at<uchar>(cv::Point(x,y)) = 255;    
+                                        }
+                                        else {
+                                            accumulator.at<uchar>(cv::Point(x,y)) = accumulator_space[x][y];
+                                        }
                                     }
                                 } 
                                 
@@ -1406,16 +1444,662 @@ int main(int argc, char * argv[]) {
             break;
 
         case ANIMATION_MODE :
-            std::string image_path = ANIMATION_IMAGE_DIRECTORY;
-            cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
-            cv::Mat output_internal(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
-            cv::Mat output_external(image.rows, image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
-            for(int x = 0; x < image.rows; x++) {
-                for(int y = 0; y < image.cols; y++) {
+            //edge
+                std::string image_path = ANIMATION_IMAGE_PATH_EDGE;
+                cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
+                cv::Mat output(image.rows, image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
+                
+                cv::Mat temp(image.rows + 2, image.cols + 2, CV_8UC1, cv::Scalar(0));
+                cv::Mat temp2(image.rows + 2, image.cols + 2, CV_8UC1, cv::Scalar(0));
+                int sequence_number = 0;
+                int sequence_title = 0;
+                int offset_1 = image.cols/3 * 0;
+                int offset_2 = image.cols/3 * 1;
+                int offset_3 = image.cols/3 * 2;
+
+                for(int x = 0; x < image.cols/3; x++) {
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel1 = image.at<cv::Vec3b>(cv::Point(x + offset_1,y));
+                        cv::Vec3b pixel2 = image.at<cv::Vec3b>(cv::Point(x + offset_2,y));
+                        cv::Vec3b pixel3 = image.at<cv::Vec3b>(cv::Point(x + offset_3,y));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = color2gray(pixel1.val[0], pixel1.val[1], pixel1.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = color2gray(pixel2.val[0], pixel2.val[1], pixel2.val[2]);;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[2] = color2gray(pixel3.val[0], pixel3.val[1], pixel3.val[2]);;
+                    
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_EDGE + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
 
                 }
 
-            }
+                int x_write = 1;
+                for(int x = 0; x < image.cols; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel = image.at<cv::Vec3b>(cv::Point(x, y));
+                        temp.at<uchar>(cv::Point(x_write, y_write)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);
+                        if(y==0) {
+                            temp.at<uchar>(cv::Point(x_write, y_write-1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(y==image.rows-1) {
+                            temp.at<uchar>(cv::Point(x_write, y_write+1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == 0) {
+                            temp.at<uchar>(cv::Point(x_write-1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == image.cols - 1) {
+                            temp.at<uchar>(cv::Point(x_write+1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        y_write++;
+                    }
+                    x_write++;
+                }
+
+                for(int x = 0; x < temp.cols; x++) {
+                    for(int y = 0; y < temp.rows; y++) {
+                        if((y > 0) && (x > 0) && (y < temp.rows - 1) && (x < temp.cols - 1)) {        
+                            int Gb = 
+                            1  * temp.at<uchar>(cv::Point(x - 1, y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x    , y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x - 1, y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x    , y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x - 1, y    )) +
+                            1  * temp.at<uchar>(cv::Point(x    , y    )) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y    ));
+                            Gb = Gb / 9;
+                            temp2.at<uchar>(cv::Point(x, y)) = Gb;
+                        }
+                        else {
+                            temp2.at<uchar>(cv::Point(x, y)) = temp.at<uchar>(cv::Point(x, y));
+                        }
+                    }
+                }
+
+                x_write = 1;
+                for(int x = 0; x < image.cols/3; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        int pixel1 = temp2.at<uchar>(cv::Point(x_write + offset_1,y_write));
+                        int pixel2 = temp2.at<uchar>(cv::Point(x_write + offset_2,y_write));
+                        int pixel3 = temp2.at<uchar>(cv::Point(x_write + offset_3,y_write));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = pixel1;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[3] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[2] = pixel3;
+                    
+                        y_write++;
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_EDGE + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+                    x_write++;
+                }
+
+                for(int x = 0; x < temp2.cols; x++) {
+                    for(int y = 0; y < temp2.rows; y++) {
+                        if((y > 0) && (x > 0) && (y < temp2.rows - 1) && (x < temp2.cols - 1)) {        
+                            int Gy = 
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y - 1)) +
+                                -2 * temp2.at<uchar>(cv::Point(x    , y - 1)) +
+                                -1 * temp2.at<uchar>(cv::Point(x + 1, y - 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x - 1, y + 1)) +
+                                2  * temp2.at<uchar>(cv::Point(x    , y + 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y + 1));
+
+                            int Gx =
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y - 1)) +
+                                -2 * temp2.at<uchar>(cv::Point(x - 1, y    )) +
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y + 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y - 1)) +
+                                2  * temp2.at<uchar>(cv::Point(x + 1, y    )) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y + 1));
+
+                            int G = (int)sqrt(Gx * Gx + Gy * Gy);
+                            
+                            if(G > 150) {
+                                G = 255;
+                            }
+                            else {
+                                G = 0;
+                            }
+                            temp.at<uchar>(cv::Point(x, y)) = G;
+                        }
+                        else {
+                            temp.at<uchar>(cv::Point(x, y)) = temp2.at<uchar>(cv::Point(x, y));
+                        }
+                    }
+                }
+
+                x_write = 1;
+                for(int x = 0; x < image.cols/3; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        int pixel1 = temp.at<uchar>(cv::Point(x_write + offset_1,y_write));
+                        int pixel2 = temp.at<uchar>(cv::Point(x_write + offset_2,y_write));
+                        int pixel3 = temp.at<uchar>(cv::Point(x_write + offset_3,y_write));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = pixel1;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[3] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[2] = pixel3;
+                    
+                        y_write++;
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_EDGE + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+                    x_write++;
+                }
+
+                
+                cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_EDGE + "final.JPEG", output);
+
+            // Moravec Corner
+                image_path = ANIMATION_IMAGE_PATH_MORAVEC;
+                image = cv::imread(image_path, cv::IMREAD_COLOR);
+                output = cv::Mat(image.rows, image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
+                
+                temp = cv::Mat(image.rows + 4, image.cols + 4, CV_8UC1, cv::Scalar(0));
+                temp2 = cv::Mat(image.rows + 4, image.cols + 4, CV_8UC1, cv::Scalar(0));
+                int ** temp_int = new int*[temp.rows + 6];
+                for(int y = 0; y < temp.rows + 6; y++) {
+                    temp_int[y] = new int[temp.cols + 6];
+                        for(int x = 0; x < temp.cols + 6; x++) {
+                            temp_int[y][x] = 0;
+                        }
+                }
+                
+                sequence_number = 0;
+                sequence_title = 0;
+                offset_1 = image.cols/5 * 0;
+                offset_2 = image.cols/5 * 1;
+                offset_3 = image.cols/5 * 2;
+                int offset_4 = image.cols/5 * 3;
+                int offset_5 = image.cols/5 * 4;
+
+                for(int x = 0; x < image.cols/5; x++) {
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel1 = image.at<cv::Vec3b>(cv::Point(x + offset_1,y));
+                        cv::Vec3b pixel2 = image.at<cv::Vec3b>(cv::Point(x + offset_2,y));
+                        cv::Vec3b pixel3 = image.at<cv::Vec3b>(cv::Point(x + offset_3,y));
+                        cv::Vec3b pixel4 = image.at<cv::Vec3b>(cv::Point(x + offset_4,y));
+                        cv::Vec3b pixel5 = image.at<cv::Vec3b>(cv::Point(x + offset_5,y));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = color2gray(pixel1.val[0], pixel1.val[1], pixel1.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = color2gray(pixel2.val[0], pixel2.val[1], pixel2.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = color2gray(pixel2.val[0], pixel2.val[1], pixel2.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[1] = color2gray(pixel3.val[0], pixel3.val[1], pixel3.val[2]);;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[2] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[1] = color2gray(pixel4.val[0], pixel4.val[1], pixel4.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[2] = color2gray(pixel4.val[0], pixel4.val[1], pixel4.val[2]);
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[2] = color2gray(pixel5.val[0], pixel5.val[1], pixel5.val[2]);;
+                    
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_MORAVEC + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+
+                }
+
+                x_write = 2;
+                for(int x = 0; x < image.cols; x++) {
+                    int y_write = 2;
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel = image.at<cv::Vec3b>(cv::Point(x, y));
+                        temp.at<uchar>(cv::Point(x_write, y_write)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);
+                        if(y==0) {
+                            temp.at<uchar>(cv::Point(x_write, y_write-1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                            temp.at<uchar>(cv::Point(x_write, y_write-2)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(y==image.rows-1) {
+                            temp.at<uchar>(cv::Point(x_write, y_write+1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                            temp.at<uchar>(cv::Point(x_write, y_write+2)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == 0) {
+                            temp.at<uchar>(cv::Point(x_write-1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                            temp.at<uchar>(cv::Point(x_write-2, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == image.cols - 1) {
+                            temp.at<uchar>(cv::Point(x_write+1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                            temp.at<uchar>(cv::Point(x_write+2, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        y_write++;
+                    }
+                    x_write++;
+                }
+
+                for(int x = 0; x < temp.cols; x++) {
+                    for(int y = 0; y < temp.rows; y++) {
+                        if((y > 1) && (x > 1) && (y < temp.rows - 2) && (x < temp.cols - 2)) {        
+                            //Intensity of local window
+                            int local_intensity = 
+                                    temp.at<uchar>(cv::Point(x - 1, y - 1)) +
+                                    temp.at<uchar>(cv::Point(x    , y - 1)) +
+                                    temp.at<uchar>(cv::Point(x + 1, y - 1)) +
+                                    temp.at<uchar>(cv::Point(x - 1, y + 1)) +
+                                    temp.at<uchar>(cv::Point(x    , y + 1)) +
+                                    temp.at<uchar>(cv::Point(x + 1, y + 1)) +
+                                    temp.at<uchar>(cv::Point(x - 1, y    )) +
+                                    temp.at<uchar>(cv::Point(x    , y    )) +
+                                    temp.at<uchar>(cv::Point(x + 1, y    ));
+                            local_intensity = local_intensity / 9;
+                            int min = INT32_MAX;
+                            for(int u = -1; u <= 1; u++) {
+                                for(int v = -1; v <= 1; v++) {
+                                    if(!(u == 0 && v == 0)) {        
+                                        int shifted_intensity = 
+                                            temp.at<uchar>(cv::Point(x - 1 + u, y - 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x     + u, y - 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x + 1 + v, y - 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x - 1 + u, y + 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x     + u, y + 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x + 1 + u, y + 1 + v)) +
+                                            temp.at<uchar>(cv::Point(x - 1 + u, y     + v)) +
+                                            temp.at<uchar>(cv::Point(x     + u, y     + v)) +
+                                            temp.at<uchar>(cv::Point(x + 1 + u, y     + v));
+                                        shifted_intensity = shifted_intensity / 9;
+                                        int E = (shifted_intensity - local_intensity) * (shifted_intensity - local_intensity);
+                                        if(E <= min) {
+                                            min = E;
+                                        }   
+                                    } 
+                                }
+
+                            }
+                            if(min < 150) {
+                                min = 0;
+                            }
+                            temp_int[y + 3][x + 3] = min;
+                        }
+                        else {
+                            temp_int[y + 3][x + 3] = 0;
+                        }
+                    }
+                }
+                for(int x = 2; x < temp2.cols - 2; x++) {
+                    for(int y = 2; y < temp2.rows - 2; y++) {
+                        //Intensity of local window
+                        bool is_extrema = true;
+                        int intensity = temp_int[y + 3][x + 3];
+                        for(int u = -5; u <= 5; u++) {
+                            for(int v = -5; v <= 5; v++) {
+                                if(!(u == 0 && v == 0))
+                                {        
+                                    int shifted_intensity = temp_int[y + v + 3][x + u + 3];
+                                        
+                                    if(shifted_intensity >= intensity) {
+                                        is_extrema = false;
+                                    }   
+                                } 
+                            }
+                        }
+                        if(is_extrema == true) {
+                            temp2.at<uchar>(cv::Point(x, y)) = 255;
+                        }
+                        else {
+                            temp2.at<uchar>(cv::Point(x, y)) = 0;
+                        }
+                    }
+                }
+
+                x_write = 2;
+                for(int x = 0; x < image.cols/5; x++) {
+                    int y_write = 2;
+                    for(int y = 0; y < image.rows; y++) {
+                        int pixel1 = temp2.at<uchar>(cv::Point(x_write + offset_1,y_write));
+                        int pixel2 = temp2.at<uchar>(cv::Point(x_write + offset_2,y_write));
+                        int pixel3 = temp2.at<uchar>(cv::Point(x_write + offset_3,y_write));
+                        int pixel4 = temp2.at<uchar>(cv::Point(x_write + offset_4,y_write));
+                        int pixel5 = temp2.at<uchar>(cv::Point(x_write + offset_5,y_write));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = pixel1;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 0;
+                        if(pixel1 == 255) {
+                            cv::circle(output, cv::Point(x+offset_1,y), 3, cv::Scalar(255,0,0), -1);
+                        }
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        if(pixel2 == 255) {
+                            cv::circle(output, cv::Point(x+offset_2,y), 3, cv::Scalar(255,255,0), -1);
+                        }
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[1] = pixel3;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_3, y)).val[2] = 0;
+                        if(pixel3 == 255) {
+                            cv::circle(output, cv::Point(x+offset_3,y), 3, cv::Scalar(0,255,0), -1);
+                        }
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[1] = pixel4;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_4, y)).val[2] = pixel4;
+                        if(pixel4 == 255) {
+                            cv::circle(output, cv::Point(x+offset_4,y), 3, cv::Scalar(0,255,255), -1);
+                        }
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_5, y)).val[2] = pixel5;
+                        if(pixel5 == 255) {
+                            cv::circle(output, cv::Point(x+offset_5,y), 3, cv::Scalar(0,0,255), -1);
+                        }
+                    
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_MORAVEC + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                        y_write++;
+                    }
+                    x_write++;
+                }
+                
+                cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_MORAVEC + "final.JPEG", output);
+
+            //Hough Transform
+                image_path = ANIMATION_IMAGE_PATH_HOUGH;
+                image = cv::imread(image_path, cv::IMREAD_COLOR);
+                output = cv::Mat(image.rows, image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
+                int d = (int)sqrt(image.rows * image.rows + image.cols * image.cols);
+
+                cv::Mat accumulator_image(2*d, 180, CV_8UC1, cv::Scalar(0));
+                int ** accumulator_space = new int*[180];
+                for(int theta = 0; theta < 180; theta++) {
+                    accumulator_space[theta] = new int[2*d];
+                    for(int p = 0; p < 2*d; p++) {
+                        accumulator_space[theta][p] = 0;
+                    }
+                }
+
+                temp = cv::Mat(image.rows + 2, image.cols + 2, CV_8UC1, cv::Scalar(0));
+                temp2 = cv::Mat(image.rows + 2, image.cols + 2, CV_8UC1, cv::Scalar(0));
+                
+                sequence_number = 0;
+                sequence_title = 0;
+                offset_1 = image.cols/2 * 0;
+                offset_2 = image.cols/2 * 1;
+                
+                for(int x = 0; x < image.cols/2; x++) {
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel1 = image.at<cv::Vec3b>(cv::Point(x + offset_1,y));
+                        cv::Vec3b pixel2 = image.at<cv::Vec3b>(cv::Point(x + offset_2,y));
+
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = color2gray(pixel1.val[0], pixel1.val[1], pixel1.val[2]);
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[2] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = color2gray(pixel2.val[0], pixel2.val[1], pixel2.val[2]);;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+
+                }
+
+                x_write = 1;
+                for(int x = 0; x < image.cols; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        cv::Vec3b pixel = image.at<cv::Vec3b>(cv::Point(x, y));
+                        temp.at<uchar>(cv::Point(x_write, y_write)) = color2gray(pixel.val[0], pixel.val[1], pixel.val[2]);
+                        if(y==0) {
+                            temp.at<uchar>(cv::Point(x_write, y_write-1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(y==image.rows-1) {
+                            temp.at<uchar>(cv::Point(x_write, y_write+1)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == 0) {
+                            temp.at<uchar>(cv::Point(x_write-1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        if(x == image.cols - 1) {
+                            temp.at<uchar>(cv::Point(x_write+1, y_write)) = temp.at<uchar>(cv::Point(x_write, y_write));
+                        }
+                        y_write++;
+                    }
+                    x_write++;
+                }
+
+                for(int x = 0; x < temp.cols; x++) {
+                    for(int y = 0; y < temp.rows; y++) {
+                        if((y > 0) && (x > 0) && (y < temp.rows - 1) && (x < temp.cols - 1)) {        
+                            int Gb = 
+                            1  * temp.at<uchar>(cv::Point(x - 1, y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x    , y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y - 1)) +
+                            1  * temp.at<uchar>(cv::Point(x - 1, y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x    , y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y + 1)) +
+                            1  * temp.at<uchar>(cv::Point(x - 1, y    )) +
+                            1  * temp.at<uchar>(cv::Point(x    , y    )) +
+                            1  * temp.at<uchar>(cv::Point(x + 1, y    ));
+                            Gb = Gb / 9;
+                            temp2.at<uchar>(cv::Point(x, y)) = Gb;
+                        }
+                        else {
+                            temp2.at<uchar>(cv::Point(x, y)) = temp.at<uchar>(cv::Point(x, y));
+                        }
+                    }
+                }
+
+                x_write = 1;
+                for(int x = 0; x < image.cols/2; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        int pixel1 = temp2.at<uchar>(cv::Point(x_write + offset_1,y_write));
+                        int pixel2 = temp2.at<uchar>(cv::Point(x_write + offset_2,y_write));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = pixel1;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[3] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        y_write++;
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+                    x_write++;
+                }
+
+                for(int x = 0; x < temp2.cols; x++) {
+                    for(int y = 0; y < temp2.rows; y++) {
+                        if((y > 0) && (x > 0) && (y < temp2.rows - 1) && (x < temp2.cols - 1)) {        
+                            int Gy = 
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y - 1)) +
+                                -2 * temp2.at<uchar>(cv::Point(x    , y - 1)) +
+                                -1 * temp2.at<uchar>(cv::Point(x + 1, y - 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x - 1, y + 1)) +
+                                2  * temp2.at<uchar>(cv::Point(x    , y + 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y + 1));
+
+                            int Gx =
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y - 1)) +
+                                -2 * temp2.at<uchar>(cv::Point(x - 1, y    )) +
+                                -1 * temp2.at<uchar>(cv::Point(x - 1, y + 1)) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y - 1)) +
+                                2  * temp2.at<uchar>(cv::Point(x + 1, y    )) +
+                                1  * temp2.at<uchar>(cv::Point(x + 1, y + 1));
+
+                            int G = (int)sqrt(Gx * Gx + Gy * Gy);
+                            
+                            if(G > 150) {
+                                G = 255;
+                            }
+                            else {
+                                G = 0;
+                            }
+                            temp.at<uchar>(cv::Point(x, y)) = G;
+                        }
+                        else {
+                            temp.at<uchar>(cv::Point(x, y)) = temp2.at<uchar>(cv::Point(x, y));
+                        }
+                    }
+                }
+
+                x_write = 1;
+                for(int x = 0; x < image.cols/2; x++) {
+                    int y_write = 1;
+                    for(int y = 0; y < image.rows; y++) {
+                        int pixel1 = temp.at<uchar>(cv::Point(x_write + offset_1,y_write));
+                        int pixel2 = temp.at<uchar>(cv::Point(x_write + offset_2,y_write));
+                        
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[0] = pixel1;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[1] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x, y)).val[3] = 0;
+
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[0] = 0;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[1] = pixel2;
+                        output.at<cv::Vec3b>(cv::Point(x + offset_2, y)).val[2] = 0;
+                        
+                        y_write++;
+                        if(sequence_number % 100 == 0) {
+                            cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + std::to_string(sequence_title) + ".JPEG", output);
+                            sequence_title++;
+                        }
+                        sequence_number++;
+                    }
+                    x_write++;
+                }
+                
+                //Fill up accumulator space
+                int accum_sequence = 0;
+                for(int x = 0; x < temp.cols/2; x++) {
+                    for(int y = 0; y < temp.rows; y++) {
+                        if((y > 0) && (x > 0) && (y < temp2.rows - 1) && (x < temp2.cols/2 - 1)) {        
+                            // Accumulator math
+                                
+                                cv::Mat temp3 = output.clone();                                    
+                                if(temp.at<uchar>(cv::Point(x, y)) == 255) {
+                                    cv::circle(temp3, cv::Point(x + offset_2 - 1, y - 1), 5, cv::Scalar(0,0,255), 2);
+                                    //Feature space exploration
+                                    for(int theta = 0; theta < 180; theta++) {
+                                        int p = (int)((double)(x - 1) * cos((double)theta * 3.14/180.0) + (double)(y - 1) * sin((double)theta * 3.14/180.0)) + d;
+                                        accumulator_space[theta][p] += 1;
+                                        if(accumulator_space[theta][p]/2 > 255) {
+                                            accumulator_image.at<uchar>(cv::Point(theta, p)) = 255;
+                                        }
+                                        else {
+                                            accumulator_image.at<uchar>(cv::Point(theta, p)) = accumulator_space[theta][p];
+                                        }
+                                    }
+                                }
+
+                                if(temp.at<uchar>(cv::Point(x + offset_2, y)) == 255) {
+                                    cv::circle(temp3, cv::Point(x - 1, y - 1), 5, cv::Scalar(0,0,255), 2);
+                                    //Feature space exploration
+                                    for(int theta = 0; theta < 180; theta++) {
+                                        int p = (int)((double)(x + offset_2 - 1) * cos((double)theta * 3.14/180.0) + (double)(y - 1) * sin((double)theta * 3.14/180.0)) + d;
+                                        accumulator_space[theta][p] += 1;    
+                                        if(accumulator_space[theta][p]/2 > 255) {
+                                            accumulator_image.at<uchar>(cv::Point(theta, p)) = 255;
+                                        }
+                                        else {
+                                            accumulator_image.at<uchar>(cv::Point(theta, p)) = accumulator_space[theta][p];
+                                        }
+                                    }
+                                }
+                                if(sequence_number % 25  == 0) {
+                                    cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + "accum" + std::to_string(accum_sequence) + ".JPEG", accumulator_image);
+                                    accum_sequence++;
+                                }
+                                if(sequence_number % 100 == 0) {
+                                    cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + std::to_string(sequence_title) + ".JPEG", temp3);
+                                    sequence_title++;
+                                }
+                                sequence_number++;
+                        }
+                        else {
+                            accumulator_image.at<uchar>(cv::Point(x, y)) = 0;
+                        }
+
+
+                    }
+                }
+                int max = 0;
+                int max_theta = 0;
+                int max_p = 0;
+
+                temp = image.clone();
+                for(int theta = 0; theta < 180; theta++) {
+                    for(int p = 0; p < 2*d; p++) {
+                        if(accumulator_space[theta][p] > max) {
+                            max = accumulator_space[theta][p];
+                            max_p = p - d + 1;
+                            max_theta = theta;
+                        }
+                    }
+                }
+            
+                double a = cos((double)max_theta * 3.14/180.0);
+                double b = sin((double)max_theta * 3.14/180.0);
+                double x0 = (a * (double)max_p); //+ image.cols/2;
+                double y0 = (b * (double)max_p); //+ image.rows/2;
+                int x1 = (int)(x0 + 1000.0 * (-b));
+                int y1 = (int)(y0 + 1000.0 * (a));
+                int x2 = (int)(x0 - 1000.0 * (-b));
+                int y2 = (int)(y0 - 1000.0 * (a));
+                cv::line(temp, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0,0,255), 3);
+                cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + "final.JPEG", temp);
+                //cv::imwrite(ANIMATION_OUTPUT_DIRECTORY_HOUGH + "final.JPEG", output);
 
 
             //Render example outputs

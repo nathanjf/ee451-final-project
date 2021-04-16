@@ -17,7 +17,9 @@ TEST_DATA_PATH=/home/nathanjf/github/ee451-final-project/output/test_data.txt
 TEST_OUTPUT_DIRECTORY=/home/nathanjf/github/ee451-final-project/output/testoutput/
 
 //This should be the full path to where the animation image is
-ANIMATION_IMAGE_DIRECTORY=/home/nathanjf/pictures/animationimage/
+ANIMATION_IMAGE_PATH_EDGE=/home/nathanjf/pictures/animationimage/edge.JPEG
+ANIMATION_IMAGE_PATH_MORAVEC=/home/nathanjf/pictures/animationimage/moravec.JPEG
+ANIMATION_IMAGE_PATH_HOUGH=/home/nathanjf/pictures/animationimage/hough.JPEG
 
 //This should be the full path to where the animation outputs should be
 ANIMATION_OUTPUT_DIRECTORY_EDGE=/home/nathanjf/github/ee451-final-project/output/animationoutput/edge/
